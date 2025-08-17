@@ -1,0 +1,6 @@
+mem0ai
+transformers>=4.51.0
+torch>=2.0.0
+accelerate
+bitsandbytes
+# flash-attn (install manually if CUDA available)
