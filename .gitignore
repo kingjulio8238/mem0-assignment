@@ -1,3 +1,10 @@
 venv/
-venv 
+model_cache/
+__pycache__/
 
+# Benchmark results files
+benchmarks/*.json
+benchmarks/*.md 
+
+#Unsloth 
+unsloth_compiled_cache/
