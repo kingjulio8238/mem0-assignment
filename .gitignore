@@ -1,10 +1,63 @@
+# Python
 venv/
-model_cache/
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
 
-# Benchmark results files
-benchmarks/*.json
-benchmarks/*.md 
+# Model files and caches
+model_cache/
+mem0-backend/model_cache/
 
-#Unsloth 
+# Large model files (keep structure, exclude weights)
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# Training artifacts - exclude model directories (available on HuggingFace)
+finetune/memory_model_final/
+finetune/memory_model_gguf_final/
+finetune/training_trials/trial_*/
+
+# Build artifacts and external repositories
+finetune/llama.cpp/
+finetune/llama.cpp/build/
+finetune/llama.cpp/models/
+finetune/llama.cpp/build-*
+
+# Unsloth cache
 unsloth_compiled_cache/
+finetune/unsloth_compiled_cache/
+**/unsloth_compiled_cache/
+
+# Temporary files
+finetune/_unsloth_sentencepiece_temp/
+*.tmp
+*.temp
+*.log
+
+# Benchmark results - KEEP JSON files for analysis
+# benchmarks/base_model_results/
+# benchmarks/finetuned_bf16_results/ 
+# benchmarks/finetuned_q4km_results/
+# benchmarks/model_comparisons/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files (if you add any)
+.env
+.env.local
+.env.*.local

@@ -11,7 +11,7 @@ The pipeline is configured with:
 
 ## Files
 
-- `finetune_pipeline.py`: Main fine-tuning pipeline implementation
+- `train_with_hyperparamter_training.py`: Main fine-tuning pipeline implementation
 - `README.md`: This documentation file
 
 ## Usage

@@ -2,6 +2,22 @@
 
 This directory contains an advanced fine-tuning pipeline for memory-centric LLMs using Unsloth with automated hyperparameter tuning and VRAM monitoring.
 
+`train_with_hyperparameter_tuning.py`: 
+``` bash
+python train_with_hyperparameter_tuning.py \
+  --max-trials 3 \
+  --num-epochs 2 \
+  --export-formats gguf \
+  --hf-repo-name "kingJulio/llama-3.1-8b-memory-finetune"
+```
+^^ can also add `--disable-plots` to disable plots (not recommended)
+
+What the above command does: 
+- Phase 1: Test 3 different hyperparameter configurations (quick 60-step training each)
+- Phase 2: Train the final model with the best config for 2 full epochs
+- Export: Save as GGUF format for efficient inference
+- Upload: Push to your Hugging Face repository
+
 ## Files Overview
 
 - `memory_dataset.jsonl` - 5,000 memory-focused training examples in ChatML format

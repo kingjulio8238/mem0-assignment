@@ -4,7 +4,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Setup for local Llama model without Ollama
-model_path = "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--unsloth--llama-3.1-8b-bnb-4bit/snapshots/b80adf5d249b569469d0a19192ff36e88f133413"
+model_path = "unsloth/llama-3.1-8b-bnb-4bit"
 
 # Load the model and tokenizer
 print("Loading Llama 3.1 8B model...")

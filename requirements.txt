@@ -1,3 +1,6 @@
+packaging
+wheel
+setuptools
 mem0ai
 transformers>=4.51.0
 torch>=2.0.0 
@@ -11,3 +14,7 @@ datasets
 trl
 psutil
 numpy<2
+huggingface_hub
+matplotlib>=3.5.0
+seaborn>=0.11.0
+mistral-common

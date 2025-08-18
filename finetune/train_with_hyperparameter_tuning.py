@@ -20,10 +20,15 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from datasets import Dataset
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
 
 from unsloth import FastLanguageModel
 from transformers import TrainingArguments
 from trl import SFTTrainer
+# Note: HuggingFace upload functionality moved to upload_to_hf.py
+import os
 
 
 class VRAMMonitor:
@@ -149,72 +154,374 @@ class HyperparameterTuner:
         return configs
 
 
+class TrainingPlotter:
+    """Generate comprehensive plots for training metrics and analysis."""
+    
+    def __init__(self, output_dir: str = "./training_plots"):
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(exist_ok=True)
+        
+        # Set plotting style
+        plt.style.use('default')
+        sns.set_palette("husl")
+        
+    def plot_hyperparameter_results(self, results: List[Dict], save_name: str = "hyperparameter_comparison"):
+        """Create comprehensive hyperparameter tuning visualization."""
+        valid_results = [r for r in results if r["final_loss"] != float('inf')]
+        if not valid_results:
+            print("⚠️ No valid results to plot")
+            return
+            
+        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+        fig.suptitle('Hyperparameter Tuning Results', fontsize=16, fontweight='bold')
+        
+        # Extract data
+        configs = [r['config'] for r in valid_results]
+        losses = [r['final_loss'] for r in valid_results]
+        memories = [r['peak_memory'] for r in valid_results]
+        times = [r['training_time'] for r in valid_results]
+        
+        # 1. Loss vs LoRA Rank
+        ranks = [c['lora_rank'] for c in configs]
+        axes[0,0].scatter(ranks, losses, s=100, alpha=0.7)
+        axes[0,0].set_xlabel('LoRA Rank')
+        axes[0,0].set_ylabel('Final Loss')
+        axes[0,0].set_title('Loss vs LoRA Rank')
+        axes[0,0].grid(True, alpha=0.3)
+        
+        # 2. Loss vs Batch Size
+        batch_sizes = [c['batch_size'] for c in configs]
+        axes[0,1].scatter(batch_sizes, losses, s=100, alpha=0.7, color='orange')
+        axes[0,1].set_xlabel('Batch Size')
+        axes[0,1].set_ylabel('Final Loss')
+        axes[0,1].set_title('Loss vs Batch Size')
+        axes[0,1].grid(True, alpha=0.3)
+        
+        # 3. Loss vs Learning Rate
+        lrs = [c['learning_rate'] for c in configs]
+        axes[0,2].scatter(lrs, losses, s=100, alpha=0.7, color='green')
+        axes[0,2].set_xlabel('Learning Rate')
+        axes[0,2].set_ylabel('Final Loss')
+        axes[0,2].set_title('Loss vs Learning Rate')
+        axes[0,2].set_xscale('log')
+        axes[0,2].grid(True, alpha=0.3)
+        
+        # 4. Memory Usage vs Performance
+        axes[1,0].scatter(memories, losses, s=100, alpha=0.7, color='red')
+        axes[1,0].set_xlabel('Peak Memory (GB)')
+        axes[1,0].set_ylabel('Final Loss')
+        axes[1,0].set_title('Memory vs Performance Trade-off')
+        axes[1,0].grid(True, alpha=0.3)
+        
+        # 5. Training Time vs Performance
+        axes[1,1].scatter(times, losses, s=100, alpha=0.7, color='purple')
+        axes[1,1].set_xlabel('Training Time (s)')
+        axes[1,1].set_ylabel('Final Loss')
+        axes[1,1].set_title('Time vs Performance Trade-off')
+        axes[1,1].grid(True, alpha=0.3)
+        
+        # 6. Configuration Rankings
+        trial_names = [r['trial_name'] for r in valid_results]
+        colors = sns.color_palette("RdYlGn_r", len(valid_results))
+        bars = axes[1,2].bar(range(len(trial_names)), losses, color=colors)
+        axes[1,2].set_xlabel('Trial')
+        axes[1,2].set_ylabel('Final Loss')
+        axes[1,2].set_title('Trial Comparison (Lower is Better)')
+        axes[1,2].set_xticks(range(len(trial_names)))
+        axes[1,2].set_xticklabels([t.replace('trial_', '') for t in trial_names])
+        axes[1,2].grid(True, alpha=0.3, axis='y')
+        
+        # Add value labels on bars
+        for bar, loss in zip(bars, losses):
+            height = bar.get_height()
+            axes[1,2].text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                          f'{loss:.3f}', ha='center', va='bottom', fontsize=10)
+        
+        plt.tight_layout()
+        save_path = self.output_dir / f"{save_name}.png"
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.savefig(save_path.with_suffix('.pdf'), bbox_inches='tight')  # Also save as PDF
+        print(f"📊 Hyperparameter plots saved to {save_path}")
+        plt.close()
+        
+    def plot_memory_usage_timeline(self, memory_history: List[Dict], save_name: str = "memory_timeline"):
+        """Plot memory usage over time during training."""
+        if not memory_history:
+            return
+            
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+        fig.suptitle('Memory Usage Timeline', fontsize=16, fontweight='bold')
+        
+        # Extract timeline data
+        timestamps = [(h['timestamp'] - memory_history[0]['timestamp'])/60 for h in memory_history]  # Convert to minutes
+        gpu_allocated = [h['gpu']['allocated'] for h in memory_history]
+        gpu_total = memory_history[0]['gpu']['total']
+        sys_used = [h['system']['used'] for h in memory_history]
+        sys_total = memory_history[0]['system']['total']
+        stages = [h['stage'] for h in memory_history]
+        
+        # GPU Memory Plot
+        ax1.plot(timestamps, gpu_allocated, 'b-', linewidth=2, label='GPU Allocated')
+        ax1.axhline(y=gpu_total, color='r', linestyle='--', alpha=0.7, label=f'GPU Total ({gpu_total:.1f}GB)')
+        ax1.fill_between(timestamps, gpu_allocated, alpha=0.3)
+        ax1.set_ylabel('GPU Memory (GB)')
+        ax1.set_title('GPU Memory Usage')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # System Memory Plot  
+        ax2.plot(timestamps, sys_used, 'g-', linewidth=2, label='System RAM Used')
+        ax2.axhline(y=sys_total, color='r', linestyle='--', alpha=0.7, label=f'System Total ({sys_total:.1f}GB)')
+        ax2.fill_between(timestamps, sys_used, alpha=0.3, color='green')
+        ax2.set_xlabel('Time (minutes)')
+        ax2.set_ylabel('System RAM (GB)')
+        ax2.set_title('System Memory Usage')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        
+        # Add stage annotations
+        for i, (time, stage) in enumerate(zip(timestamps, stages)):
+            if stage and i % 3 == 0:  # Avoid overcrowding
+                ax1.annotate(stage, (time, gpu_allocated[i]), 
+                           xytext=(5, 5), textcoords='offset points', 
+                           fontsize=8, alpha=0.8, rotation=45)
+        
+        plt.tight_layout()
+        save_path = self.output_dir / f"{save_name}.png"
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"📊 Memory timeline plot saved to {save_path}")
+        plt.close()
+        
+    def plot_training_loss_curve(self, trainer_logs: List[Dict], save_name: str = "training_loss"):
+        """Plot training loss curve if available."""
+        if not trainer_logs:
+            print("⚠️ No training logs available for loss curve")
+            return
+            
+        fig, ax = plt.subplots(1, 1, figsize=(12, 6))
+        
+        steps = [log.get('step', i) for i, log in enumerate(trainer_logs)]
+        losses = [log.get('train_loss', log.get('loss', 0)) for log in trainer_logs]
+        
+        ax.plot(steps, losses, 'b-', linewidth=2, marker='o', markersize=3)
+        ax.set_xlabel('Training Step')
+        ax.set_ylabel('Training Loss')
+        ax.set_title('Training Loss Curve', fontsize=14, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        
+        # Add trend line
+        if len(steps) > 1:
+            z = np.polyfit(steps, losses, 1)
+            p = np.poly1d(z)
+            ax.plot(steps, p(steps), "r--", alpha=0.8, linewidth=1, label=f'Trend (slope: {z[0]:.4f})')
+            ax.legend()
+        
+        plt.tight_layout()
+        save_path = self.output_dir / f"{save_name}.png"
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"📊 Training loss curve saved to {save_path}")
+        plt.close()
+        
+    def create_summary_report(self, results: List[Dict], best_config: Dict, memory_history: List[Dict]):
+        """Generate a comprehensive summary report with key metrics."""
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+        fig.suptitle('Training Summary Report', fontsize=18, fontweight='bold')
+        
+        valid_results = [r for r in results if r["final_loss"] != float('inf')]
+        
+        if valid_results:
+            # 1. Trial Performance Comparison
+            trial_names = [r['trial_name'] for r in valid_results]
+            losses = [r['final_loss'] for r in valid_results]
+            colors = ['gold' if r['config'] == best_config else 'lightblue' for r in valid_results]
+            
+            bars = ax1.bar(range(len(trial_names)), losses, color=colors)
+            ax1.set_title('Trial Performance (Gold = Best)')
+            ax1.set_xlabel('Trial')
+            ax1.set_ylabel('Final Loss')
+            ax1.set_xticks(range(len(trial_names)))
+            ax1.set_xticklabels([t.replace('trial_', '') for t in trial_names])
+            
+            for bar, loss in zip(bars, losses):
+                height = bar.get_height()
+                ax1.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                        f'{loss:.3f}', ha='center', va='bottom', fontsize=9)
+            
+            # 2. Resource Usage Distribution
+            memories = [r['peak_memory'] for r in valid_results]
+            times = [r['training_time'] for r in valid_results]
+            
+            ax2.scatter(memories, times, s=100, alpha=0.7, c=losses, cmap='RdYlBu_r')
+            ax2.set_xlabel('Peak Memory (GB)')
+            ax2.set_ylabel('Training Time (s)')
+            ax2.set_title('Resource Usage vs Performance')
+            cbar = plt.colorbar(ax2.collections[0], ax=ax2)
+            cbar.set_label('Final Loss')
+            
+            # 3. Best Configuration Visualization
+            config_keys = ['lora_rank', 'batch_size', 'learning_rate', 'max_seq_length']
+            config_values = [best_config[key] for key in config_keys]
+            config_labels = ['LoRA Rank', 'Batch Size', 'Learning Rate', 'Max Seq Length']
+            
+            # Normalize values for radar chart
+            normalized_values = []
+            for key, val in zip(config_keys, config_values):
+                if key == 'learning_rate':
+                    normalized_values.append(val * 10000)  # Scale up for visibility
+                else:
+                    normalized_values.append(val)
+            
+            bars = ax3.bar(config_labels, normalized_values, color='lightgreen', alpha=0.7)
+            ax3.set_title('Best Configuration Parameters')
+            ax3.set_ylabel('Value (Learning Rate × 10000)')
+            
+            for bar, val, orig_val in zip(bars, normalized_values, config_values):
+                height = bar.get_height()
+                display_val = f'{orig_val}' if isinstance(orig_val, int) else f'{orig_val:.4f}'
+                ax3.text(bar.get_x() + bar.get_width()/2., height + max(normalized_values)*0.01,
+                        display_val, ha='center', va='bottom', fontsize=9, rotation=45)
+        
+        # 4. Memory Usage Summary
+        if memory_history:
+            peak_gpu = max(h['gpu']['allocated'] for h in memory_history)
+            avg_gpu = np.mean([h['gpu']['allocated'] for h in memory_history])
+            total_gpu = memory_history[0]['gpu']['total']
+            
+            memory_data = [avg_gpu, peak_gpu - avg_gpu, total_gpu - peak_gpu]
+            memory_labels = ['Average Used', 'Peak Additional', 'Remaining']
+            colors = ['orange', 'red', 'lightgray']
+            
+            wedges, texts, autotexts = ax4.pie(memory_data, labels=memory_labels, colors=colors, 
+                                               autopct='%1.1f%%', startangle=90)
+            ax4.set_title(f'GPU Memory Utilization\n(Peak: {peak_gpu:.1f}GB / {total_gpu:.1f}GB)')
+        
+        plt.tight_layout()
+        save_path = self.output_dir / "training_summary_report.png"
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"📊 Summary report saved to {save_path}")
+        plt.close()
+
+
 class AdvancedMemoryTrainer:
     """Advanced training pipeline with memory monitoring and hyperparameter tuning."""
     
-    def __init__(self, model_name: str = "unsloth/llama-3.1-8b-bnb-4bit"):
+    def __init__(self, model_name: str = "unsloth/llama-3.1-8b-bnb-4bit", enable_plotting: bool = True):
         self.model_name = model_name
         self.vram_monitor = VRAMMonitor()
         self.hyperparameter_tuner = HyperparameterTuner(self.vram_monitor)
+        self.plotter = TrainingPlotter() if enable_plotting else None
         self.model = None
         self.tokenizer = None
         self.best_config = None
         self.best_loss = float('inf')
+        self.training_logs = []
         
     def load_dataset(self, dataset_path: str) -> Dataset:
         """Load and prepare the memory dataset."""
         print(f"Loading dataset from {dataset_path}")
         
-        # Load JSONL dataset
-        data = []
-        with open(dataset_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                data.append(json.loads(line.strip()))
-        
-        # Convert to HuggingFace dataset
-        dataset = Dataset.from_list(data)
-        
-        print(f"Dataset loaded: {len(dataset)} examples")
-        print(f"Sample example: {dataset[0]['text'][:100]}...")
-        
-        return dataset
+        try:
+            # Check if file exists
+            if not Path(dataset_path).exists():
+                raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
+            
+            # Load JSONL dataset
+            data = []
+            with open(dataset_path, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    try:
+                        line = line.strip()
+                        if line:  # Skip empty lines
+                            data.append(json.loads(line))
+                    except json.JSONDecodeError as e:
+                        print(f"⚠️ Warning: Invalid JSON on line {line_num}: {e}")
+                        continue
+            
+            if not data:
+                raise ValueError("No valid data found in dataset file")
+            
+            # Convert to HuggingFace dataset
+            dataset = Dataset.from_list(data)
+            
+            # Validate dataset structure
+            if len(dataset) == 0:
+                raise ValueError("Dataset is empty after loading")
+            
+            required_field = "text"
+            if required_field not in dataset.column_names:
+                raise ValueError(f"Dataset missing required field: '{required_field}'. Found fields: {dataset.column_names}")
+            
+            print(f"Dataset loaded: {len(dataset)} examples")
+            print(f"Sample example: {dataset[0]['text'][:100]}...")
+            
+            return dataset
+            
+        except Exception as e:
+            print(f"❌ Failed to load dataset: {str(e)}")
+            raise
     
     def load_model_with_config(self, config: Dict):
         """Load model with specific configuration."""
-        self.vram_monitor.log_memory_usage("Before Model Loading")
-        
-        # Clear any existing model
-        if self.model is not None:
-            del self.model
-            del self.tokenizer
+        try:
+            self.vram_monitor.log_memory_usage("Before Model Loading")
+            
+            # Validate configuration
+            required_keys = ["max_seq_length", "lora_rank", "lora_alpha"]
+            for key in required_keys:
+                if key not in config:
+                    raise ValueError(f"Missing required config key: {key}")
+            
+            # Clear any existing model
+            if self.model is not None:
+                del self.model
+                del self.tokenizer
+                self.vram_monitor.clear_cache()
+            
+            print(f"\n🚀 Loading model with config: {config}")
+            
+            # Check available VRAM before loading
+            gpu_memory = self.vram_monitor.get_gpu_memory()
+            if gpu_memory["free"] < 2.0:  # Need at least 2GB free
+                print(f"⚠️ Warning: Low GPU memory ({gpu_memory['free']:.1f}GB free)")
+                self.vram_monitor.clear_cache()
+            
+            # Load model with configuration
+            self.model, self.tokenizer = FastLanguageModel.from_pretrained(
+                model_name=self.model_name,
+                max_seq_length=config["max_seq_length"],
+                dtype=None,  # Auto-detect
+                load_in_4bit=True,  # Always use 4-bit for memory efficiency
+            )
+            
+            if self.model is None or self.tokenizer is None:
+                raise RuntimeError("Failed to load model or tokenizer")
+            
+            # Setup LoRA with configuration
+            self.model = FastLanguageModel.get_peft_model(
+                self.model,
+                r=config["lora_rank"],
+                target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+                              "gate_proj", "up_proj", "down_proj"],
+                lora_alpha=config["lora_alpha"],
+                lora_dropout=0,  # Optimized for Unsloth
+                bias="none",    # Optimized for Unsloth
+                use_gradient_checkpointing="unsloth",  # Memory efficient
+                random_state=3407,
+                use_rslora=False,
+                loftq_config=None,
+            )
+            
+            self.vram_monitor.log_memory_usage("After Model Loading")
+            
+        except torch.cuda.OutOfMemoryError as e:
+            print(f"❌ CUDA Out of Memory during model loading: {str(e)}")
+            print("💡 Try reducing max_seq_length or lora_rank")
             self.vram_monitor.clear_cache()
-        
-        print(f"\n🚀 Loading model with config: {config}")
-        
-        # Load model with configuration
-        self.model, self.tokenizer = FastLanguageModel.from_pretrained(
-            model_name=self.model_name,
-            max_seq_length=config["max_seq_length"],
-            dtype=None,  # Auto-detect
-            load_in_4bit=True,  # Always use 4-bit for memory efficiency
-        )
-        
-        # Setup LoRA with configuration
-        self.model = FastLanguageModel.get_peft_model(
-            self.model,
-            r=config["lora_rank"],
-            target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                          "gate_proj", "up_proj", "down_proj"],
-            lora_alpha=config["lora_alpha"],
-            lora_dropout=0,  # Optimized for Unsloth
-            bias="none",    # Optimized for Unsloth
-            use_gradient_checkpointing="unsloth",  # Memory efficient
-            random_state=3407,
-            use_rslora=False,
-            loftq_config=None,
-        )
-        
-        self.vram_monitor.log_memory_usage("After Model Loading")
+            raise
+        except Exception as e:
+            print(f"❌ Failed to load model: {str(e)}")
+            self.vram_monitor.clear_cache()
+            raise
         
     def create_training_args(self, config: Dict, output_dir: str) -> TrainingArguments:
         """Create training arguments based on configuration."""
@@ -233,7 +540,7 @@ class AdvancedMemoryTrainer:
             seed=3407,
             output_dir=output_dir,
             save_strategy="no",  # Don't save intermediate checkpoints during tuning
-            evaluation_strategy="no",
+            eval_strategy="no",
             report_to="none",  # No external logging during tuning
             dataloader_pin_memory=False,  # Reduce memory usage
             remove_unused_columns=False,
@@ -315,36 +622,73 @@ class AdvancedMemoryTrainer:
     
     def run_hyperparameter_tuning(self, dataset_path: str, max_trials: int = 5) -> Dict:
         """Run hyperparameter tuning with multiple configurations."""
-        print("🔍 Starting Hyperparameter Tuning")
-        print(f"Dataset: {dataset_path}")
-        print(f"Max trials: {max_trials}")
-        
-        # Load dataset
-        dataset = self.load_dataset(dataset_path)
-        
-        # Generate configurations
-        configs = self.hyperparameter_tuner.generate_configs(max_trials)
-        
-        if not configs:
-            raise RuntimeError("No feasible configurations found for available VRAM")
-        
-        # Run trials
-        results = []
-        for i, config in enumerate(configs):
-            trial_name = f"trial_{i+1:02d}"
-            result = self.train_with_config(config, dataset, trial_name)
-            results.append(result)
+        try:
+            print("🔍 Starting Hyperparameter Tuning")
+            print(f"Dataset: {dataset_path}")
+            print(f"Max trials: {max_trials}")
             
-            # Save intermediate results
-            self.save_tuning_results(results, "intermediate_results.json")
-        
-        # Final analysis
-        self.analyze_results(results)
-        return {
-            "best_config": self.best_config,
-            "best_loss": self.best_loss,
-            "all_results": results
-        }
+            # Validate inputs
+            if max_trials <= 0:
+                raise ValueError("max_trials must be greater than 0")
+            
+            # Load dataset
+            dataset = self.load_dataset(dataset_path)
+            
+            # Generate configurations
+            configs = self.hyperparameter_tuner.generate_configs(max_trials)
+            
+            if not configs:
+                raise RuntimeError("No feasible configurations found for available VRAM")
+            
+            # Run trials
+            results = []
+            successful_trials = 0
+            
+            for i, config in enumerate(configs):
+                trial_name = f"trial_{i+1:02d}"
+                print(f"\n🔄 Running trial {i+1}/{len(configs)}")
+                
+                result = self.train_with_config(config, dataset, trial_name)
+                results.append(result)
+                
+                if result["final_loss"] != float('inf'):
+                    successful_trials += 1
+                
+                # Save intermediate results
+                try:
+                    self.save_tuning_results(results, "intermediate_results.json")
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to save intermediate results: {e}")
+            
+            if successful_trials == 0:
+                raise RuntimeError("All hyperparameter tuning trials failed")
+            
+            print(f"\n✅ Completed {successful_trials}/{len(configs)} trials successfully")
+            
+            # Final analysis
+            self.analyze_results(results)
+            
+            # Generate plots if plotting is enabled
+            if self.plotter:
+                try:
+                    print("\n📊 Generating training plots...")
+                    self.plotter.plot_hyperparameter_results(results)
+                    self.plotter.plot_memory_usage_timeline(self.vram_monitor.memory_history)
+                    if self.best_config:
+                        self.plotter.create_summary_report(results, self.best_config, self.vram_monitor.memory_history)
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to generate plots: {e}")
+            
+            return {
+                "best_config": self.best_config,
+                "best_loss": self.best_loss,
+                "all_results": results,
+                "successful_trials": successful_trials
+            }
+            
+        except Exception as e:
+            print(f"❌ Hyperparameter tuning failed: {str(e)}")
+            raise
     
     def analyze_results(self, results: List[Dict]):
         """Analyze hyperparameter tuning results."""
@@ -373,13 +717,31 @@ class AdvancedMemoryTrainer:
     
     def save_tuning_results(self, results: List[Dict], filename: str):
         """Save tuning results to file."""
-        output_path = Path("./training_trials") / filename
-        output_path.parent.mkdir(exist_ok=True)
-        
-        with open(output_path, 'w') as f:
-            json.dump(results, f, indent=2)
-        
-        print(f"💾 Results saved to {output_path}")
+        try:
+            output_path = Path("./training_trials") / filename
+            output_path.parent.mkdir(exist_ok=True)
+            
+            # Create backup if file exists
+            if output_path.exists():
+                backup_path = output_path.with_suffix(f".backup_{int(time.time())}.json")
+                output_path.rename(backup_path)
+                print(f"📋 Backed up existing results to {backup_path}")
+            
+            with open(output_path, 'w') as f:
+                json.dump(results, f, indent=2, default=str)  # default=str handles non-serializable objects
+            
+            print(f"💾 Results saved to {output_path}")
+            
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to save results to {filename}: {e}")
+            # Try to save to a temporary location
+            try:
+                temp_path = Path(f"./training_results_backup_{int(time.time())}.json")
+                with open(temp_path, 'w') as f:
+                    json.dump(results, f, indent=2, default=str)
+                print(f"💾 Results saved to backup location: {temp_path}")
+            except Exception as backup_e:
+                print(f"❌ Failed to save backup results: {backup_e}")
     
     def export_model(self, save_path: str, export_formats: List[str]):
         """Export model in specified formats for deployment."""
@@ -428,74 +790,112 @@ class AdvancedMemoryTrainer:
         except Exception as e:
             print(f"❌ vLLM export failed: {str(e)}")
 
+
+
     def train_final_model(self, dataset_path: str, config: Optional[Dict] = None, 
                          num_epochs: int = 3, save_path: str = "./final_memory_model",
-                         export_formats: Optional[List[str]] = None):
+                         export_formats: Optional[List[str]] = None,
+                         hf_repo_name: Optional[str] = None, hf_token: Optional[str] = None):
         """Train final model with best configuration for full epochs."""
-        if config is None:
-            if self.best_config is None:
-                raise ValueError("No best configuration found. Run hyperparameter tuning first.")
-            config = self.best_config
+        try:
+            if config is None:
+                if self.best_config is None:
+                    raise ValueError("No best configuration found. Run hyperparameter tuning first.")
+                config = self.best_config
+            
+            print(f"\n🎯 Training Final Model")
+            print(f"Configuration: {config}")
+            print(f"Epochs: {num_epochs}")
+            
+            # Validate parameters
+            if num_epochs <= 0:
+                raise ValueError("num_epochs must be greater than 0")
+            
+            # Load dataset and model
+            dataset = self.load_dataset(dataset_path)
+            self.load_model_with_config(config)
+            
+            # Create training arguments for full training
+            training_args = TrainingArguments(
+                per_device_train_batch_size=config["batch_size"],
+                gradient_accumulation_steps=config["gradient_accumulation"],
+                warmup_steps=10,
+                num_train_epochs=num_epochs,  # Full training
+                learning_rate=config["learning_rate"],
+                fp16=not torch.cuda.is_bf16_supported(),
+                bf16=torch.cuda.is_bf16_supported(),
+                logging_steps=10,
+                optim="adamw_8bit",
+                weight_decay=0.01,
+                lr_scheduler_type="linear",
+                seed=3407,
+                output_dir=save_path,
+                save_strategy="epoch",
+                eval_strategy="no",
+                report_to="none",
+            )
+            
+            # Create trainer
+            trainer = SFTTrainer(
+                model=self.model,
+                tokenizer=self.tokenizer,
+                train_dataset=dataset,
+                dataset_text_field="text",
+                max_seq_length=config["max_seq_length"],
+                dataset_num_proc=2,
+                args=training_args,
+            )
+            
+            # Train
+            self.vram_monitor.log_memory_usage("Before Final Training")
+            print("🚀 Starting final training...")
+            
+            train_result = trainer.train()
+            
+            self.vram_monitor.log_memory_usage("After Final Training")
+            
+            # Save model
+            try:
+                self.model.save_pretrained(save_path)
+                self.tokenizer.save_pretrained(save_path)
+                print(f"✅ Final model saved to {save_path}")
+            except Exception as e:
+                print(f"⚠️ Failed to save model: {str(e)}")
+            
+            print(f"Final training loss: {train_result.training_loss:.4f}")
+            
+            # Export in requested formats
+            if export_formats:
+                try:
+                    self.export_model(save_path, export_formats)
+                except Exception as e:
+                    print(f"⚠️ Export failed: {str(e)}")
+            
+            # Note: Use upload_to_hf.py script for HuggingFace uploads
+            if hf_repo_name:
+                print(f"💡 To upload to HuggingFace, run: python upload_to_hf.py --model-path {save_path} --repo-name {hf_repo_name}")
+            
+            # Generate final training plots
+            if self.plotter and self.training_logs:
+                try:
+                    print("\n📊 Generating final training plots...")
+                    self.plotter.plot_training_loss_curve(self.training_logs, "final_training_loss")
+                except Exception as e:
+                    print(f"⚠️ Failed to generate loss curve: {str(e)}")
+            
+            return train_result
         
-        print(f"\n🎯 Training Final Model")
-        print(f"Configuration: {config}")
-        print(f"Epochs: {num_epochs}")
-        
-        # Load dataset and model
-        dataset = self.load_dataset(dataset_path)
-        self.load_model_with_config(config)
-        
-        # Create training arguments for full training
-        training_args = TrainingArguments(
-            per_device_train_batch_size=config["batch_size"],
-            gradient_accumulation_steps=config["gradient_accumulation"],
-            warmup_steps=10,
-            num_train_epochs=num_epochs,  # Full training
-            learning_rate=config["learning_rate"],
-            fp16=not torch.cuda.is_bf16_supported(),
-            bf16=torch.cuda.is_bf16_supported(),
-            logging_steps=10,
-            optim="adamw_8bit",
-            weight_decay=0.01,
-            lr_scheduler_type="linear",
-            seed=3407,
-            output_dir=save_path,
-            save_strategy="epoch",
-            evaluation_strategy="no",
-            report_to="none",
-        )
-        
-        # Create trainer
-        trainer = SFTTrainer(
-            model=self.model,
-            tokenizer=self.tokenizer,
-            train_dataset=dataset,
-            dataset_text_field="text",
-            max_seq_length=config["max_seq_length"],
-            dataset_num_proc=2,
-            args=training_args,
-        )
-        
-        # Train
-        self.vram_monitor.log_memory_usage("Before Final Training")
-        print("🚀 Starting final training...")
-        
-        train_result = trainer.train()
-        
-        self.vram_monitor.log_memory_usage("After Final Training")
-        
-        # Save model
-        self.model.save_pretrained(save_path)
-        self.tokenizer.save_pretrained(save_path)
-        
-        print(f"✅ Final model saved to {save_path}")
-        print(f"Final training loss: {train_result.training_loss:.4f}")
-        
-        # Export in requested formats
-        if export_formats:
-            self.export_model(save_path, export_formats)
-        
-        return train_result
+        except torch.cuda.OutOfMemoryError as e:
+            print(f"❌ CUDA Out of Memory during final training: {str(e)}")
+            print("💡 Try reducing batch_size or max_seq_length in config")
+            self.vram_monitor.clear_cache()
+            raise
+        except Exception as e:
+            print(f"❌ Final training failed: {str(e)}")
+            self.vram_monitor.clear_cache()
+            raise
+        finally:
+            self.vram_monitor.clear_cache()
 
 
 def parse_args():
@@ -514,43 +914,65 @@ def parse_args():
                        help="Export formats for deployment (gguf, vllm)")
     parser.add_argument("--skip-tuning", action="store_true",
                        help="Skip hyperparameter tuning and use default config")
+    parser.add_argument("--hf-repo-name", type=str,
+                       help="Hugging Face repository name (e.g., username/model-name)")
+    parser.add_argument("--hf-token", type=str,
+                       help="Hugging Face token (or set HF_TOKEN environment variable)")
+    parser.add_argument("--disable-plots", action="store_true",
+                       help="Disable generation of training plots and visualizations")
     return parser.parse_args()
 
 
 def main():
     """Main training script with hyperparameter tuning."""
-    args = parse_args()
-    
-    print("🚀 Advanced Memory Fine-tuning with Hyperparameter Tuning")
-    print("Based on Unsloth documentation and best practices")
-    print(f"Dataset: {args.dataset_path}")
-    print(f"Export formats: {args.export_formats or 'None'}")
-    
-    # Initialize trainer
-    trainer = AdvancedMemoryTrainer()
-    
-    if not args.skip_tuning:
-        print("Phase 1: Hyperparameter Tuning")
-        tuning_results = trainer.run_hyperparameter_tuning(
+    try:
+        args = parse_args()
+        
+        # Validate arguments
+        if args.max_trials <= 0 and not args.skip_tuning:
+            raise ValueError("max_trials must be greater than 0")
+        if args.num_epochs <= 0:
+            raise ValueError("num_epochs must be greater than 0")
+        if args.hf_repo_name and not (args.hf_token or os.getenv("HF_TOKEN")):
+            print("⚠️ Warning: HF_TOKEN not set for upload")
+        
+        print("🚀 Advanced Memory Fine-tuning with Hyperparameter Tuning")
+        print("Based on Unsloth documentation and best practices")
+        print(f"Dataset: {args.dataset_path}")
+        print(f"Export formats: {args.export_formats or 'None'}")
+        
+        # Initialize trainer
+        trainer = AdvancedMemoryTrainer(enable_plotting=not args.disable_plots)
+        
+        if not args.skip_tuning:
+            print("Phase 1: Hyperparameter Tuning")
+            tuning_results = trainer.run_hyperparameter_tuning(
+                dataset_path=args.dataset_path,
+                max_trials=args.max_trials
+            )
+            print(f"Best configuration: {tuning_results['best_config']}")
+            print(f"Best loss: {tuning_results['best_loss']:.4f}")
+        else:
+            print("Skipping hyperparameter tuning - using default configuration")
+        
+        print("\nPhase 2: Final Model Training")
+        final_result = trainer.train_final_model(
             dataset_path=args.dataset_path,
-            max_trials=args.max_trials
+            num_epochs=args.num_epochs,
+            save_path=args.save_path,
+            export_formats=args.export_formats,
+            hf_repo_name=args.hf_repo_name,
+            hf_token=args.hf_token
         )
-        print(f"Best configuration: {tuning_results['best_config']}")
-        print(f"Best loss: {tuning_results['best_loss']:.4f}")
-    else:
-        print("Skipping hyperparameter tuning - using default configuration")
+        
+        print("\n🎉 Training Pipeline Complete!")
+        if args.export_formats:
+            print(f"Model exported in formats: {args.export_formats}")
     
-    print("\nPhase 2: Final Model Training")
-    final_result = trainer.train_final_model(
-        dataset_path=args.dataset_path,
-        num_epochs=args.num_epochs,
-        save_path=args.save_path,
-        export_formats=args.export_formats
-    )
-    
-    print("\n🎉 Training Pipeline Complete!")
-    if args.export_formats:
-        print(f"Model exported in formats: {args.export_formats}")
+    except Exception as e:
+        print(f"❌ Training pipeline failed: {str(e)}")
+        import sys
+        sys.exit(1)
 
 
 if __name__ == "__main__":
