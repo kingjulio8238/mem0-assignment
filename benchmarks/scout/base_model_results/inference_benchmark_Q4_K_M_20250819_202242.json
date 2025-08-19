@@ -1,0 +1,1023 @@
+{
+  "model_info": {
+    "model_path": "/home/ubuntu/mem0-assignment/model_cache/scout_gguf/Q4_K_M",
+    "model_type": "gguf",
+    "quantization": "4bit",
+    "timestamp": "2025-08-19T19:44:15.917330"
+  },
+  "individual_results": [
+    {
+      "prompt_id": 1,
+      "prompt": "Explain quantum computing in simple terms.",
+      "latency": 23.35658288002014,
+      "tokens_generated": 124,
+      "throughput": 5.343247368036757,
+      "response_length": 549,
+      "input_tokens": 7.800000000000001,
+      "total_tokens": 132
+    },
+    {
+      "prompt_id": 2,
+      "prompt": "Write a short story about time travel.",
+      "latency": 23.31298565864563,
+      "tokens_generated": 123,
+      "throughput": 5.297476771457626,
+      "response_length": 569,
+      "input_tokens": 9.1,
+      "total_tokens": 132
+    },
+    {
+      "prompt_id": 3,
+      "prompt": "What are the benefits of renewable energy?",
+      "latency": 23.446942806243896,
+      "tokens_generated": 115,
+      "throughput": 4.934545239270563,
+      "response_length": 702,
+      "input_tokens": 9.1,
+      "total_tokens": 124
+    },
+    {
+      "prompt_id": 4,
+      "prompt": "Describe how machine learning works.",
+      "latency": 23.374722480773926,
+      "tokens_generated": 110,
+      "throughput": 4.727328852391209,
+      "response_length": 590,
+      "input_tokens": 6.5,
+      "total_tokens": 117
+    },
+    {
+      "prompt_id": 5,
+      "prompt": "What is the capital of France and why is it important?",
+      "latency": 23.564552068710327,
+      "tokens_generated": 127,
+      "throughput": 5.406425703680797,
+      "response_length": 587,
+      "input_tokens": 14.3,
+      "total_tokens": 141
+    },
+    {
+      "prompt_id": 6,
+      "prompt": "How does photosynthesis work in plants?",
+      "latency": 23.36441731452942,
+      "tokens_generated": 117,
+      "throughput": 5.007614717069886,
+      "response_length": 558,
+      "input_tokens": 7.800000000000001,
+      "total_tokens": 124
+    },
+    {
+      "prompt_id": 7,
+      "prompt": "Explain the theory of relativity.",
+      "latency": 23.287250518798828,
+      "tokens_generated": 137,
+      "throughput": 5.917401021162194,
+      "response_length": 684,
+      "input_tokens": 6.5,
+      "total_tokens": 144
+    },
+    {
+      "prompt_id": 8,
+      "prompt": "What are the main causes of climate change?",
+      "latency": 23.715010404586792,
+      "tokens_generated": 131,
+      "throughput": 5.536577794399992,
+      "response_length": 685,
+      "input_tokens": 10.4,
+      "total_tokens": 141
+    },
+    {
+      "prompt_id": 9,
+      "prompt": "Describe the process of making bread.",
+      "latency": 23.386648893356323,
+      "tokens_generated": 131,
+      "throughput": 5.614314414978013,
+      "response_length": 549,
+      "input_tokens": 7.800000000000001,
+      "total_tokens": 139
+    },
+    {
+      "prompt_id": 10,
+      "prompt": "What is artificial intelligence?",
+      "latency": 23.16800618171692,
+      "tokens_generated": 150,
+      "throughput": 6.508976163818713,
+      "response_length": 707,
+      "input_tokens": 5.2,
+      "total_tokens": 156
+    },
+    {
+      "prompt_id": 11,
+      "prompt": "How do vaccines work?",
+      "latency": 23.25687551498413,
+      "tokens_generated": 149,
+      "throughput": 6.428206570726963,
+      "response_length": 633,
+      "input_tokens": 5.2,
+      "total_tokens": 154
+    },
+    {
+      "prompt_id": 12,
+      "prompt": "Explain the water cycle.",
+      "latency": 23.398499011993408,
+      "tokens_generated": 131,
+      "throughput": 5.611471057724658,
+      "response_length": 607,
+      "input_tokens": 5.2,
+      "total_tokens": 136
+    },
+    {
+      "prompt_id": 13,
+      "prompt": "What is blockchain technology?",
+      "latency": 23.355666399002075,
+      "tokens_generated": 120,
+      "throughput": 5.176474005689931,
+      "response_length": 650,
+      "input_tokens": 5.2,
+      "total_tokens": 126
+    },
+    {
+      "prompt_id": 14,
+      "prompt": "Describe the human digestive system.",
+      "latency": 23.353851795196533,
+      "tokens_generated": 132,
+      "throughput": 5.677864241104477,
+      "response_length": 635,
+      "input_tokens": 6.5,
+      "total_tokens": 139
+    },
+    {
+      "prompt_id": 15,
+      "prompt": "How does the internet work?",
+      "latency": 23.317643642425537,
+      "tokens_generated": 130,
+      "throughput": 5.575177406153943,
+      "response_length": 696,
+      "input_tokens": 6.5,
+      "total_tokens": 136
+    },
+    {
+      "prompt_id": 16,
+      "prompt": "What are the phases of the moon?",
+      "latency": 23.39144515991211,
+      "tokens_generated": 135,
+      "throughput": 5.779890856495846,
+      "response_length": 531,
+      "input_tokens": 9.1,
+      "total_tokens": 144
+    },
+    {
+      "prompt_id": 17,
+      "prompt": "Explain cellular respiration.",
+      "latency": 22.762384176254272,
+      "tokens_generated": 131,
+      "throughput": 5.768288549359088,
+      "response_length": 651,
+      "input_tokens": 3.9000000000000004,
+      "total_tokens": 135
+    },
+    {
+      "prompt_id": 18,
+      "prompt": "What is DNA and how does it work?",
+      "latency": 22.752821683883667,
+      "tokens_generated": 107,
+      "throughput": 4.7422689589497375,
+      "response_length": 539,
+      "input_tokens": 10.4,
+      "total_tokens": 118
+    },
+    {
+      "prompt_id": 19,
+      "prompt": "Describe the formation of mountains.",
+      "latency": 22.62986922264099,
+      "tokens_generated": 132,
+      "throughput": 5.859512430029195,
+      "response_length": 651,
+      "input_tokens": 6.5,
+      "total_tokens": 139
+    },
+    {
+      "prompt_id": 20,
+      "prompt": "How do solar panels generate electricity?",
+      "latency": 22.68649196624756,
+      "tokens_generated": 123,
+      "throughput": 5.443768044162159,
+      "response_length": 641,
+      "input_tokens": 7.800000000000001,
+      "total_tokens": 131
+    },
+    {
+      "prompt_id": 21,
+      "prompt": "What is the greenhouse effect?",
+      "latency": 22.71138024330139,
+      "tokens_generated": 133,
+      "throughput": 5.895722697852904,
+      "response_length": 655,
+      "input_tokens": 6.5,
+      "total_tokens": 140
+    },
+    {
+      "prompt_id": 22,
+      "prompt": "Explain how antibiotics work.",
+      "latency": 22.565996646881104,
+      "tokens_generated": 127,
+      "throughput": 5.645662453716984,
+      "response_length": 679,
+      "input_tokens": 5.2,
+      "total_tokens": 132
+    },
+    {
+      "prompt_id": 23,
+      "prompt": "Describe the process of evolution.",
+      "latency": 22.63799548149109,
+      "tokens_generated": 135,
+      "throughput": 5.972260225537197,
+      "response_length": 704,
+      "input_tokens": 6.5,
+      "total_tokens": 141
+    },
+    {
+      "prompt_id": 24,
+      "prompt": "What causes earthquakes?",
+      "latency": 22.520509958267212,
+      "tokens_generated": 135,
+      "throughput": 6.003416452404467,
+      "response_length": 630,
+      "input_tokens": 3.9000000000000004,
+      "total_tokens": 139
+    },
+    {
+      "prompt_id": 25,
+      "prompt": "How do computers process information?",
+      "latency": 22.648696184158325,
+      "tokens_generated": 122,
+      "throughput": 5.395454069690468,
+      "response_length": 689,
+      "input_tokens": 6.5,
+      "total_tokens": 128
+    },
+    {
+      "prompt_id": 26,
+      "prompt": "What is gravity and how does it work?",
+      "latency": 23.64906930923462,
+      "tokens_generated": 130,
+      "throughput": 5.497045076071424,
+      "response_length": 666,
+      "input_tokens": 10.4,
+      "total_tokens": 140
+    },
+    {
+      "prompt_id": 27,
+      "prompt": "Explain the carbon cycle.",
+      "latency": 23.264512300491333,
+      "tokens_generated": 128,
+      "throughput": 5.532030860465618,
+      "response_length": 687,
+      "input_tokens": 5.2,
+      "total_tokens": 133
+    },
+    {
+      "prompt_id": 28,
+      "prompt": "Describe how the brain works.",
+      "latency": 23.246612787246704,
+      "tokens_generated": 141,
+      "throughput": 6.095511690104714,
+      "response_length": 709,
+      "input_tokens": 6.5,
+      "total_tokens": 148
+    },
+    {
+      "prompt_id": 29,
+      "prompt": "What is renewable energy?",
+      "latency": 23.18461298942566,
+      "tokens_generated": 137,
+      "throughput": 5.943597163465684,
+      "response_length": 716,
+      "input_tokens": 5.2,
+      "total_tokens": 143
+    },
+    {
+      "prompt_id": 30,
+      "prompt": "How do birds fly?",
+      "latency": 23.30233931541443,
+      "tokens_generated": 123,
+      "throughput": 5.2998970759259825,
+      "response_length": 582,
+      "input_tokens": 5.2,
+      "total_tokens": 128
+    },
+    {
+      "prompt_id": 31,
+      "prompt": "Explain the nitrogen cycle.",
+      "latency": 23.167372941970825,
+      "tokens_generated": 118,
+      "throughput": 5.106319145304713,
+      "response_length": 585,
+      "input_tokens": 5.2,
+      "total_tokens": 123
+    },
+    {
+      "prompt_id": 32,
+      "prompt": "What is nuclear energy?",
+      "latency": 23.201782941818237,
+      "tokens_generated": 133,
+      "throughput": 5.7711082090446775,
+      "response_length": 659,
+      "input_tokens": 5.2,
+      "total_tokens": 139
+    },
+    {
+      "prompt_id": 33,
+      "prompt": "Describe how batteries work.",
+      "latency": 23.183743953704834,
+      "tokens_generated": 126,
+      "throughput": 5.439155998781156,
+      "response_length": 644,
+      "input_tokens": 5.2,
+      "total_tokens": 131
+    },
+    {
+      "prompt_id": 34,
+      "prompt": "What causes the seasons?",
+      "latency": 23.222917318344116,
+      "tokens_generated": 152,
+      "throughput": 6.549564721562954,
+      "response_length": 719,
+      "input_tokens": 5.2,
+      "total_tokens": 157
+    },
+    {
+      "prompt_id": 35,
+      "prompt": "How do submarines work underwater?",
+      "latency": 23.420278549194336,
+      "tokens_generated": 120,
+      "throughput": 5.162193086049312,
+      "response_length": 615,
+      "input_tokens": 6.5,
+      "total_tokens": 127
+    },
+    {
+      "prompt_id": 36,
+      "prompt": "Explain the structure of atoms.",
+      "latency": 23.2625470161438,
+      "tokens_generated": 144,
+      "throughput": 6.203104066801385,
+      "response_length": 649,
+      "input_tokens": 6.5,
+      "total_tokens": 150
+    },
+    {
+      "prompt_id": 37,
+      "prompt": "What is global warming?",
+      "latency": 23.21737551689148,
+      "tokens_generated": 144,
+      "throughput": 6.215172765544346,
+      "response_length": 610,
+      "input_tokens": 5.2,
+      "total_tokens": 149
+    },
+    {
+      "prompt_id": 38,
+      "prompt": "Describe how plants grow.",
+      "latency": 23.225513219833374,
+      "tokens_generated": 115,
+      "throughput": 4.981590671641144,
+      "response_length": 585,
+      "input_tokens": 5.2,
+      "total_tokens": 120
+    },
+    {
+      "prompt_id": 39,
+      "prompt": "How do magnets work?",
+      "latency": 23.267282962799072,
+      "tokens_generated": 137,
+      "throughput": 5.9224792263162715,
+      "response_length": 603,
+      "input_tokens": 5.2,
+      "total_tokens": 143
+    },
+    {
+      "prompt_id": 40,
+      "prompt": "What is the ozone layer?",
+      "latency": 23.248279333114624,
+      "tokens_generated": 131,
+      "throughput": 5.647729800500873,
+      "response_length": 648,
+      "input_tokens": 6.5,
+      "total_tokens": 137
+    },
+    {
+      "prompt_id": 41,
+      "prompt": "Explain how vaccines are developed.",
+      "latency": 23.16219663619995,
+      "tokens_generated": 131,
+      "throughput": 5.668719684159517,
+      "response_length": 640,
+      "input_tokens": 6.5,
+      "total_tokens": 137
+    },
+    {
+      "prompt_id": 42,
+      "prompt": "Describe the water purification process.",
+      "latency": 23.17974877357483,
+      "tokens_generated": 131,
+      "throughput": 5.664427224063941,
+      "response_length": 618,
+      "input_tokens": 6.5,
+      "total_tokens": 137
+    },
+    {
+      "prompt_id": 43,
+      "prompt": "What is gene therapy?",
+      "latency": 23.286897897720337,
+      "tokens_generated": 130,
+      "throughput": 5.5825383256705186,
+      "response_length": 587,
+      "input_tokens": 5.2,
+      "total_tokens": 135
+    },
+    {
+      "prompt_id": 44,
+      "prompt": "How do satellites stay in orbit?",
+      "latency": 23.303105115890503,
+      "tokens_generated": 122,
+      "throughput": 5.243936350639864,
+      "response_length": 602,
+      "input_tokens": 7.800000000000001,
+      "total_tokens": 130
+    },
+    {
+      "prompt_id": 45,
+      "prompt": "Explain the process of fermentation.",
+      "latency": 23.179259300231934,
+      "tokens_generated": 119,
+      "throughput": 5.159785239505185,
+      "response_length": 648,
+      "input_tokens": 6.5,
+      "total_tokens": 126
+    },
+    {
+      "prompt_id": 46,
+      "prompt": "What is biodiversity?",
+      "latency": 23.166181087493896,
+      "tokens_generated": 122,
+      "throughput": 5.274930707762136,
+      "response_length": 693,
+      "input_tokens": 3.9000000000000004,
+      "total_tokens": 126
+    },
+    {
+      "prompt_id": 47,
+      "prompt": "Describe how the heart works.",
+      "latency": 23.347466945648193,
+      "tokens_generated": 136,
+      "throughput": 5.84645864657462,
+      "response_length": 618,
+      "input_tokens": 6.5,
+      "total_tokens": 143
+    },
+    {
+      "prompt_id": 48,
+      "prompt": "How do wind turbines generate electricity?",
+      "latency": 23.432329177856445,
+      "tokens_generated": 128,
+      "throughput": 5.492411745462399,
+      "response_length": 640,
+      "input_tokens": 7.800000000000001,
+      "total_tokens": 136
+    },
+    {
+      "prompt_id": 49,
+      "prompt": "What is oceanography?",
+      "latency": 23.30042552947998,
+      "tokens_generated": 114,
+      "throughput": 4.909781576961319,
+      "response_length": 607,
+      "input_tokens": 3.9000000000000004,
+      "total_tokens": 118
+    },
+    {
+      "prompt_id": 50,
+      "prompt": "Explain the rock cycle.",
+      "latency": 23.292581796646118,
+      "tokens_generated": 127,
+      "throughput": 5.469552543048029,
+      "response_length": 626,
+      "input_tokens": 5.2,
+      "total_tokens": 132
+    },
+    {
+      "prompt_id": 51,
+      "prompt": "What is nanotechnology?",
+      "latency": 23.24148201942444,
+      "tokens_generated": 126,
+      "throughput": 5.425643678600613,
+      "response_length": 604,
+      "input_tokens": 3.9000000000000004,
+      "total_tokens": 130
+    },
+    {
+      "prompt_id": 52,
+      "prompt": "Describe how muscles work.",
+      "latency": 23.395718574523926,
+      "tokens_generated": 126,
+      "throughput": 5.389875057623272,
+      "response_length": 628,
+      "input_tokens": 5.2,
+      "total_tokens": 131
+    },
+    {
+      "prompt_id": 53,
+      "prompt": "How do airplanes fly?",
+      "latency": 23.455644130706787,
+      "tokens_generated": 144,
+      "throughput": 6.152037402847987,
+      "response_length": 614,
+      "input_tokens": 5.2,
+      "total_tokens": 149
+    },
+    {
+      "prompt_id": 54,
+      "prompt": "What is meteorology?",
+      "latency": 23.319133758544922,
+      "tokens_generated": 115,
+      "throughput": 4.961590820568264,
+      "response_length": 675,
+      "input_tokens": 3.9000000000000004,
+      "total_tokens": 119
+    },
+    {
+      "prompt_id": 55,
+      "prompt": "Explain the immune system.",
+      "latency": 23.30656123161316,
+      "tokens_generated": 130,
+      "throughput": 5.577828436726531,
+      "response_length": 670,
+      "input_tokens": 5.2,
+      "total_tokens": 135
+    },
+    {
+      "prompt_id": 56,
+      "prompt": "What is geothermal energy?",
+      "latency": 23.43356156349182,
+      "tokens_generated": 126,
+      "throughput": 5.381170918400076,
+      "response_length": 645,
+      "input_tokens": 5.2,
+      "total_tokens": 131
+    },
+    {
+      "prompt_id": 57,
+      "prompt": "Describe how vision works.",
+      "latency": 23.572986841201782,
+      "tokens_generated": 144,
+      "throughput": 6.121413504876135,
+      "response_length": 600,
+      "input_tokens": 5.2,
+      "total_tokens": 149
+    },
+    {
+      "prompt_id": 58,
+      "prompt": "How do earthquakes create tsunamis?",
+      "latency": 23.64732551574707,
+      "tokens_generated": 107,
+      "throughput": 4.562883863046075,
+      "response_length": 546,
+      "input_tokens": 6.5,
+      "total_tokens": 114
+    },
+    {
+      "prompt_id": 59,
+      "prompt": "What is biotechnology?",
+      "latency": 23.222795009613037,
+      "tokens_generated": 143,
+      "throughput": 6.157742853123639,
+      "response_length": 727,
+      "input_tokens": 3.9000000000000004,
+      "total_tokens": 146
+    },
+    {
+      "prompt_id": 60,
+      "prompt": "Explain the digestive process.",
+      "latency": 23.296117782592773,
+      "tokens_generated": 126,
+      "throughput": 5.412919061313466,
+      "response_length": 613,
+      "input_tokens": 5.2,
+      "total_tokens": 131
+    },
+    {
+      "prompt_id": 61,
+      "prompt": "How do trees clean the air?",
+      "latency": 23.381680011749268,
+      "tokens_generated": 127,
+      "throughput": 5.448710269577791,
+      "response_length": 650,
+      "input_tokens": 7.800000000000001,
+      "total_tokens": 135
+    },
+    {
+      "prompt_id": 62,
+      "prompt": "What is hydroelectric power?",
+      "latency": 23.40451216697693,
+      "tokens_generated": 120,
+      "throughput": 5.165670582554859,
+      "response_length": 567,
+      "input_tokens": 5.2,
+      "total_tokens": 126
+    },
+    {
+      "prompt_id": 63,
+      "prompt": "Describe how sound travels.",
+      "latency": 23.31593155860901,
+      "tokens_generated": 130,
+      "throughput": 5.575586790226262,
+      "response_length": 628,
+      "input_tokens": 5.2,
+      "total_tokens": 135
+    },
+    {
+      "prompt_id": 64,
+      "prompt": "What is genetic engineering?",
+      "latency": 23.40422749519348,
+      "tokens_generated": 133,
+      "throughput": 5.721188619769612,
+      "response_length": 684,
+      "input_tokens": 5.2,
+      "total_tokens": 139
+    },
+    {
+      "prompt_id": 65,
+      "prompt": "How do volcanoes form?",
+      "latency": 23.358776330947876,
+      "tokens_generated": 124,
+      "throughput": 5.3427456229654195,
+      "response_length": 583,
+      "input_tokens": 5.2,
+      "total_tokens": 130
+    },
+    {
+      "prompt_id": 66,
+      "prompt": "Explain the respiratory system.",
+      "latency": 23.312896728515625,
+      "tokens_generated": 118,
+      "throughput": 5.074444474988775,
+      "response_length": 579,
+      "input_tokens": 5.2,
+      "total_tokens": 123
+    },
+    {
+      "prompt_id": 67,
+      "prompt": "What is solar energy?",
+      "latency": 23.297957181930542,
+      "tokens_generated": 126,
+      "throughput": 5.41249170540157,
+      "response_length": 624,
+      "input_tokens": 5.2,
+      "total_tokens": 131
+    },
+    {
+      "prompt_id": 68,
+      "prompt": "Describe how memory works in the brain.",
+      "latency": 23.558943033218384,
+      "tokens_generated": 126,
+      "throughput": 5.352532149774187,
+      "response_length": 669,
+      "input_tokens": 9.1,
+      "total_tokens": 135
+    },
+    {
+      "prompt_id": 69,
+      "prompt": "How do glaciers form?",
+      "latency": 23.323536157608032,
+      "tokens_generated": 119,
+      "throughput": 5.127867369330573,
+      "response_length": 592,
+      "input_tokens": 5.2,
+      "total_tokens": 124
+    },
+    {
+      "prompt_id": 70,
+      "prompt": "What is biomass energy?",
+      "latency": 23.391918182373047,
+      "tokens_generated": 100,
+      "throughput": 4.279255733522112,
+      "response_length": 543,
+      "input_tokens": 5.2,
+      "total_tokens": 105
+    },
+    {
+      "prompt_id": 71,
+      "prompt": "Explain the endocrine system.",
+      "latency": 23.3109233379364,
+      "tokens_generated": 126,
+      "throughput": 5.409481133455738,
+      "response_length": 635,
+      "input_tokens": 5.2,
+      "total_tokens": 131
+    },
+    {
+      "prompt_id": 72,
+      "prompt": "How do tides work?",
+      "latency": 23.511963605880737,
+      "tokens_generated": 128,
+      "throughput": 5.473809085337729,
+      "response_length": 578,
+      "input_tokens": 5.2,
+      "total_tokens": 133
+    },
+    {
+      "prompt_id": 73,
+      "prompt": "What is sustainable development?",
+      "latency": 23.32701063156128,
+      "tokens_generated": 127,
+      "throughput": 5.46147991323109,
+      "response_length": 763,
+      "input_tokens": 5.2,
+      "total_tokens": 132
+    },
+    {
+      "prompt_id": 74,
+      "prompt": "Describe how enzymes work.",
+      "latency": 23.326958417892456,
+      "tokens_generated": 136,
+      "throughput": 5.851598719158368,
+      "response_length": 651,
+      "input_tokens": 5.2,
+      "total_tokens": 141
+    },
+    {
+      "prompt_id": 75,
+      "prompt": "How do coral reefs form?",
+      "latency": 23.402719736099243,
+      "tokens_generated": 118,
+      "throughput": 5.054968026537509,
+      "response_length": 557,
+      "input_tokens": 6.5,
+      "total_tokens": 124
+    },
+    {
+      "prompt_id": 76,
+      "prompt": "What is wind energy?",
+      "latency": 23.284085988998413,
+      "tokens_generated": 137,
+      "throughput": 5.918205252510648,
+      "response_length": 641,
+      "input_tokens": 5.2,
+      "total_tokens": 143
+    },
+    {
+      "prompt_id": 77,
+      "prompt": "Explain the nervous system.",
+      "latency": 23.402223587036133,
+      "tokens_generated": 126,
+      "throughput": 5.388376857909101,
+      "response_length": 681,
+      "input_tokens": 5.2,
+      "total_tokens": 131
+    },
+    {
+      "prompt_id": 78,
+      "prompt": "How do ecosystems maintain balance?",
+      "latency": 23.389405012130737,
+      "tokens_generated": 128,
+      "throughput": 5.502491402977149,
+      "response_length": 661,
+      "input_tokens": 6.5,
+      "total_tokens": 135
+    },
+    {
+      "prompt_id": 79,
+      "prompt": "What is nuclear fusion?",
+      "latency": 23.28911828994751,
+      "tokens_generated": 131,
+      "throughput": 5.637826145469586,
+      "response_length": 650,
+      "input_tokens": 5.2,
+      "total_tokens": 136
+    },
+    {
+      "prompt_id": 80,
+      "prompt": "Describe how hormones work.",
+      "latency": 23.254017114639282,
+      "tokens_generated": 131,
+      "throughput": 5.646336258922838,
+      "response_length": 667,
+      "input_tokens": 5.2,
+      "total_tokens": 136
+    },
+    {
+      "prompt_id": 81,
+      "prompt": "How do rivers form valleys?",
+      "latency": 23.40994167327881,
+      "tokens_generated": 123,
+      "throughput": 5.275536424807441,
+      "response_length": 627,
+      "input_tokens": 6.5,
+      "total_tokens": 130
+    },
+    {
+      "prompt_id": 82,
+      "prompt": "What is conservation biology?",
+      "latency": 23.30583357810974,
+      "tokens_generated": 132,
+      "throughput": 5.689562639138812,
+      "response_length": 778,
+      "input_tokens": 5.2,
+      "total_tokens": 137
+    },
+    {
+      "prompt_id": 83,
+      "prompt": "Explain the lymphatic system.",
+      "latency": 23.325339555740356,
+      "tokens_generated": 122,
+      "throughput": 5.238937667251521,
+      "response_length": 582,
+      "input_tokens": 5.2,
+      "total_tokens": 127
+    },
+    {
+      "prompt_id": 84,
+      "prompt": "How do deserts form?",
+      "latency": 22.6274733543396,
+      "tokens_generated": 127,
+      "throughput": 5.630323722182912,
+      "response_length": 674,
+      "input_tokens": 5.2,
+      "total_tokens": 132
+    },
+    {
+      "prompt_id": 85,
+      "prompt": "What is alternative energy?",
+      "latency": 22.70669674873352,
+      "tokens_generated": 126,
+      "throughput": 5.553427757255503,
+      "response_length": 665,
+      "input_tokens": 5.2,
+      "total_tokens": 131
+    },
+    {
+      "prompt_id": 86,
+      "prompt": "Describe how proteins are made.",
+      "latency": 22.757937908172607,
+      "tokens_generated": 130,
+      "throughput": 5.71229258663702,
+      "response_length": 591,
+      "input_tokens": 6.5,
+      "total_tokens": 136
+    },
+    {
+      "prompt_id": 87,
+      "prompt": "How do mountains affect weather?",
+      "latency": 22.626879692077637,
+      "tokens_generated": 122,
+      "throughput": 5.4006562841621495,
+      "response_length": 677,
+      "input_tokens": 6.5,
+      "total_tokens": 128
+    },
+    {
+      "prompt_id": 88,
+      "prompt": "What is environmental science?",
+      "latency": 19.403927326202393,
+      "tokens_generated": 119,
+      "throughput": 6.163700677156026,
+      "response_length": 710,
+      "input_tokens": 5.2,
+      "total_tokens": 124
+    },
+    {
+      "prompt_id": 89,
+      "prompt": "Explain the circulatory system.",
+      "latency": 22.632632732391357,
+      "tokens_generated": 127,
+      "throughput": 5.629040222866682,
+      "response_length": 610,
+      "input_tokens": 5.2,
+      "total_tokens": 132
+    },
+    {
+      "prompt_id": 90,
+      "prompt": "How do wetlands filter water?",
+      "latency": 22.754474401474,
+      "tokens_generated": 123,
+      "throughput": 5.427503963440257,
+      "response_length": 643,
+      "input_tokens": 6.5,
+      "total_tokens": 130
+    },
+    {
+      "prompt_id": 91,
+      "prompt": "What is biomimicry?",
+      "latency": 22.68125295639038,
+      "tokens_generated": 113,
+      "throughput": 4.986497007791379,
+      "response_length": 608,
+      "input_tokens": 3.9000000000000004,
+      "total_tokens": 117
+    },
+    {
+      "prompt_id": 92,
+      "prompt": "Describe how cells divide.",
+      "latency": 22.549319982528687,
+      "tokens_generated": 117,
+      "throughput": 5.188626534664998,
+      "response_length": 605,
+      "input_tokens": 5.2,
+      "total_tokens": 122
+    },
+    {
+      "prompt_id": 93,
+      "prompt": "How do caves form?",
+      "latency": 22.551347494125366,
+      "tokens_generated": 118,
+      "throughput": 5.245806266380188,
+      "response_length": 603,
+      "input_tokens": 5.2,
+      "total_tokens": 123
+    },
+    {
+      "prompt_id": 94,
+      "prompt": "What is sustainable agriculture?",
+      "latency": 22.696609258651733,
+      "tokens_generated": 123,
+      "throughput": 5.441341417679954,
+      "response_length": 772,
+      "input_tokens": 5.2,
+      "total_tokens": 128
+    },
+    {
+      "prompt_id": 95,
+      "prompt": "Explain the skeletal system.",
+      "latency": 22.58150029182434,
+      "tokens_generated": 139,
+      "throughput": 6.159909580957352,
+      "response_length": 653,
+      "input_tokens": 5.2,
+      "total_tokens": 144
+    },
+    {
+      "prompt_id": 96,
+      "prompt": "How do forests prevent erosion?",
+      "latency": 22.63691782951355,
+      "tokens_generated": 131,
+      "throughput": 5.800259601985822,
+      "response_length": 599,
+      "input_tokens": 6.5,
+      "total_tokens": 137
+    },
+    {
+      "prompt_id": 97,
+      "prompt": "What is renewable technology?",
+      "latency": 22.55894660949707,
+      "tokens_generated": 128,
+      "throughput": 5.7050536192066135,
+      "response_length": 677,
+      "input_tokens": 5.2,
+      "total_tokens": 133
+    },
+    {
+      "prompt_id": 98,
+      "prompt": "Describe how photosynthesis converts sunlight.",
+      "latency": 22.66657519340515,
+      "tokens_generated": 130,
+      "throughput": 5.735317263007759,
+      "response_length": 643,
+      "input_tokens": 6.5,
+      "total_tokens": 136
+    },
+    {
+      "prompt_id": 99,
+      "prompt": "How do polar ice caps affect sea levels?",
+      "latency": 16.380046367645264,
+      "tokens_generated": 101,
+      "throughput": 6.190458666850337,
+      "response_length": 491,
+      "input_tokens": 10.4,
+      "total_tokens": 111
+    },
+    {
+      "prompt_id": 100,
+      "prompt": "What is ecological balance?",
+      "latency": 22.562436819076538,
+      "tokens_generated": 120,
+      "throughput": 5.3584637585679165,
+      "response_length": 660,
+      "input_tokens": 5.2,
+      "total_tokens": 126
+    }
+  ],
+  "summary": {
+    "num_prompts": 100,
+    "average_latency": 23.062378997802735,
+    "median_latency": 23.28911828994751,
+    "p95_latency": 23.564552068710327,
+    "average_tokens_generated": 127.15,
+    "average_throughput": 5.534692750400294,
+    "median_throughput": 5.502491402977149,
+    "total_latency": 2306.2378997802734,
+    "total_tokens": 12715,
+    "successful_prompts": 100,
+    "failed_prompts": 0
+  }
+}

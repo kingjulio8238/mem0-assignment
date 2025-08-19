@@ -417,7 +417,12 @@ def get_model_configs():
         "llama-4-scout": {
             "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
             "type": "transformers",
-            "quantization": None
+            "quantization": "4bit"
+        },
+        "llama-4-scout-gguf-q4km": {
+            "path": "/home/ubuntu/mem0-assignment/model_cache/scout_gguf/Q4_K_M",
+            "type": "gguf",
+            "quantization": "4bit"
         }
     }
 

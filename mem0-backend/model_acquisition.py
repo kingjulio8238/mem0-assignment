@@ -9,6 +9,7 @@ import argparse
 from transformers import (
     AutoTokenizer, 
     AutoModelForCausalLM,
+    Llama4ForConditionalGeneration,
     BitsAndBytesConfig
 )
 from pathlib import Path
@@ -88,15 +89,19 @@ class ModelAcquisition:
                 if not self.gpu_available:
                     raise RuntimeError("GPU required for model loading")
                 
-                quantization_config = self.setup_quantization_config(4)
-                model = AutoModelForCausalLM.from_pretrained(
+                # Use official Llama4ForConditionalGeneration for proper CPU offloading
+                print("🔄 Using Llama4ForConditionalGeneration with CPU offloading...")
+                print(f"💾 Available: GPU=85GB, CPU=215GB")
+                
+                # According to HuggingFace docs, Llama 4 Scout is designed for single GPU
+                # with on-the-fly quantization and automatic CPU offloading
+                model = Llama4ForConditionalGeneration.from_pretrained(
                     self.llama4_scout_id,
                     cache_dir=self.cache_dir,
-                    quantization_config=quantization_config,
-                    device_map="auto",
-                    trust_remote_code=True,
+                    device_map="auto",  # Official CPU offloading approach
                     torch_dtype=torch.bfloat16,
-                    attn_implementation=self._get_optimal_attention()  # Optimal attention
+                    trust_remote_code=True,
+                    low_cpu_mem_usage=True
                 )
                 print("✅ Llama 4 Scout loaded into GPU memory")
                 return {"status": "loaded", "model": model, "tokenizer": tokenizer}
@@ -217,14 +222,8 @@ class ModelAcquisition:
     
     def _get_optimal_attention(self):
         """Get the best available attention implementation"""
-        try:
-            import flash_attn
-            if self.gpu_available:
-                return "flash_attention_2"
-        except ImportError:
-            pass
-        
-        # Fallback to SDPA (available in PyTorch 2.0+)
+        # Note: Llama 4 Scout doesn't support Flash Attention 2.0 yet
+        # Fallback to SDPA (available in PyTorch 2.0+) which is compatible
         return "sdpa"
     
     def install_flash_attention(self):

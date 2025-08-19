@@ -7,38 +7,77 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 # Available models
 MODELS = {
     "llama3.1": "unsloth/llama-3.1-8b-bnb-4bit",
-    "llama4": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct/snapshots/92f3b1597a195b523d8d9e5700e57e4fbb8f20d3"
+    "llama4": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct/snapshots/92f3b1597a195b523d8d9e5700e57e4fbb8f20d3",
+    "llama4-gguf": "/home/ubuntu/mem0-assignment/model_cache/scout_gguf/Q4_K_M"
 }
 
 def load_model(model_choice):
     """Load the specified model and tokenizer"""
     model_path = MODELS[model_choice]
-    model_name = "Llama 3.1 8B" if model_choice == "llama3.1" else "Llama 4 Scout 17B"
+    
+    if model_choice == "llama3.1":
+        model_name = "Llama 3.1 8B"
+    elif model_choice == "llama4":
+        model_name = "Llama 4 Scout 17B"
+    else:  # llama4-gguf
+        model_name = "Llama 4 Scout 17B GGUF Q4_K_M"
     
     print(f"Loading {model_name} model from: {model_path}")
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+    
+    # Handle GGUF model differently
+    if model_choice == "llama4-gguf":
+        try:
+            from llama_cpp import Llama
+            from pathlib import Path
+            
+            # Find GGUF files in directory
+            gguf_files = list(Path(model_path).glob("*.gguf"))
+            if not gguf_files:
+                raise FileNotFoundError(f"No GGUF files found in {model_path}")
+            
+            # Use the first file
+            model_file = str(gguf_files[0])
+            print(f"Loading GGUF file: {model_file}")
+            
+            model = Llama(
+                model_path=model_file,
+                n_ctx=2048,
+                n_threads=8,
+                verbose=False
+            )
+            tokenizer = None  # GGUF models handle tokenization internally
+            print("GGUF model loaded successfully")
+            
+        except ImportError:
+            print("llama-cpp-python not found, installing...")
+            import subprocess
+            subprocess.run(["pip", "install", "llama-cpp-python"], check=True)
+            return load_model(model_choice)  # Retry after installation
+    else:
+        # Original transformers model loading
+        tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
 
-    # Load model with appropriate settings
-    load_kwargs = {
-        "device_map": "auto",
-        "torch_dtype": torch.bfloat16,
-        "trust_remote_code": True,
-    }
-    
-    # Use 4-bit quantization for Llama 3.1, regular loading for Llama 4
-    if model_choice == "llama3.1":
-        load_kwargs["load_in_4bit"] = True
-    
-    model = AutoModelForCausalLM.from_pretrained(model_path, **load_kwargs)
-    print(f"Model loaded on device: {next(model.parameters()).device}")
+        # Load model with appropriate settings
+        load_kwargs = {
+            "device_map": "auto",
+            "torch_dtype": torch.bfloat16,
+            "trust_remote_code": True,
+        }
+        
+        # Use 4-bit quantization for Llama 3.1, regular loading for Llama 4
+        if model_choice == "llama3.1":
+            load_kwargs["load_in_4bit"] = True
+        
+        model = AutoModelForCausalLM.from_pretrained(model_path, **load_kwargs)
+        print(f"Model loaded on device: {next(model.parameters()).device}")
     
     return model, tokenizer
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Test Mem0 with different Llama models")
-parser.add_argument("--model", choices=["llama3.1", "llama4"], default="llama3.1",
+parser.add_argument("--model", choices=["llama3.1", "llama4", "llama4-gguf"], default="llama3.1",
                    help="Choose which model to use (default: llama3.1)")
 args = parser.parse_args()
 
@@ -52,22 +91,34 @@ print("Memory initialized with default configuration!")
 
 def generate_with_local_model(prompt, max_length=512):
     """Generate text using the local Llama model"""
-    inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
-    inputs = {k: v.to(model.device) for k, v in inputs.items()}
-    
-    with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=max_length,
+    if args.model == "llama4-gguf":
+        # Use GGUF model generation
+        output = model(
+            prompt,
+            max_tokens=max_length,
             temperature=0.7,
-            do_sample=True,
-            pad_token_id=tokenizer.eos_token_id
+            top_p=0.9,
+            echo=False
         )
-    
-    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    # Remove the input prompt from the generated text
-    prompt_length = len(prompt)
-    return generated_text[prompt_length:].strip()
+        return output['choices'][0]['text'].strip()
+    else:
+        # Use transformers model generation
+        inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+        
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=max_length,
+                temperature=0.7,
+                do_sample=True,
+                pad_token_id=tokenizer.eos_token_id
+            )
+        
+        generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # Remove the input prompt from the generated text
+        prompt_length = len(prompt)
+        return generated_text[prompt_length:].strip()
 
 def add_memory(message, user_id=None):
     """Add a memory to the Mem0 instance"""
@@ -104,7 +155,12 @@ def chat_with_memory(user_input, user_id="alice"):
     return response
 
 if __name__ == "__main__":
-    model_name = "Llama 3.1 8B" if args.model == "llama3.1" else "Llama 4 Scout 17B"
+    if args.model == "llama3.1":
+        model_name = "Llama 3.1 8B"
+    elif args.model == "llama4":
+        model_name = "Llama 4 Scout 17B"
+    else:  # llama4-gguf
+        model_name = "Llama 4 Scout 17B GGUF Q4_K_M"
     print("="*50)
     print(f"Testing Mem0 with Local {model_name} Model")
     print("="*50)

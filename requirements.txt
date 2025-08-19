@@ -9,7 +9,7 @@ bitsandbytes
 flash-attn
 chromadb
 sentence-transformers
-unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
+unsloth
 datasets
 trl
 psutil
@@ -18,3 +18,4 @@ huggingface_hub
 matplotlib>=3.5.0
 seaborn>=0.11.0
 mistral-common
+huggingface_hub

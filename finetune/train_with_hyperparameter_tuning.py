@@ -91,8 +91,9 @@ class VRAMMonitor:
 class HyperparameterTuner:
     """Automated hyperparameter tuning for LoRA fine-tuning."""
     
-    def __init__(self, vram_monitor: VRAMMonitor):
+    def __init__(self, vram_monitor: VRAMMonitor, model_type: str = "llama3.1"):
         self.vram_monitor = vram_monitor
+        self.model_type = model_type
         self.results = []
         
         # Hyperparameter search spaces based on Unsloth recommendations
@@ -130,20 +131,37 @@ class HyperparameterTuner:
         """Generate feasible hyperparameter configurations."""
         configs = []
         
-        # Start with conservative configurations and increase complexity
-        base_configs = [
-            # Conservative config for limited VRAM
-            {"lora_rank": 8, "lora_alpha": 16, "batch_size": 1, "gradient_accumulation": 8, 
-             "learning_rate": 2e-4, "max_seq_length": 1024},
-            
-            # Balanced config 
-            {"lora_rank": 16, "lora_alpha": 16, "batch_size": 2, "gradient_accumulation": 4,
-             "learning_rate": 2e-4, "max_seq_length": 2048},
-            
-            # Higher rank config for better performance
-            {"lora_rank": 32, "lora_alpha": 32, "batch_size": 1, "gradient_accumulation": 4,
-             "learning_rate": 1e-4, "max_seq_length": 1024},
-        ]
+        # Get model-appropriate configurations based on model type
+        if 'scout' in str(self.model_type).lower():
+            # More conservative configs for Scout (109B parameters)
+            base_configs = [
+                # Ultra conservative for Scout
+                {"lora_rank": 4, "lora_alpha": 8, "batch_size": 1, "gradient_accumulation": 16, 
+                 "learning_rate": 1e-4, "max_seq_length": 512},
+                
+                # Conservative config for Scout
+                {"lora_rank": 8, "lora_alpha": 16, "batch_size": 1, "gradient_accumulation": 8, 
+                 "learning_rate": 5e-5, "max_seq_length": 1024},
+                
+                # Moderate config for Scout
+                {"lora_rank": 16, "lora_alpha": 16, "batch_size": 1, "gradient_accumulation": 4,
+                 "learning_rate": 2e-5, "max_seq_length": 1024},
+            ]
+        else:
+            # Standard configs for Llama 3.1 8B
+            base_configs = [
+                # Conservative config for limited VRAM
+                {"lora_rank": 8, "lora_alpha": 16, "batch_size": 1, "gradient_accumulation": 8, 
+                 "learning_rate": 2e-4, "max_seq_length": 1024},
+                
+                # Balanced config 
+                {"lora_rank": 16, "lora_alpha": 16, "batch_size": 2, "gradient_accumulation": 4,
+                 "learning_rate": 2e-4, "max_seq_length": 2048},
+                
+                # Higher rank config for better performance
+                {"lora_rank": 32, "lora_alpha": 32, "batch_size": 1, "gradient_accumulation": 4,
+                 "learning_rate": 1e-4, "max_seq_length": 1024},
+            ]
         
         # Filter feasible configurations
         for config in base_configs:
@@ -408,13 +426,51 @@ class AdvancedMemoryTrainer:
     def __init__(self, model_name: str = "unsloth/llama-3.1-8b-bnb-4bit", enable_plotting: bool = True):
         self.model_name = model_name
         self.vram_monitor = VRAMMonitor()
-        self.hyperparameter_tuner = HyperparameterTuner(self.vram_monitor)
+        
+        # Determine model type and configure accordingly first
+        self.model_type = self._determine_model_type(model_name)
+        self.target_modules = self._get_target_modules()
+        
+        self.hyperparameter_tuner = HyperparameterTuner(self.vram_monitor, self.model_type)
         self.plotter = TrainingPlotter() if enable_plotting else None
         self.model = None
         self.tokenizer = None
         self.best_config = None
         self.best_loss = float('inf')
         self.training_logs = []
+        
+    def _determine_model_type(self, model_name: str) -> str:
+        """Determine the type of model being used."""
+        if "scout" in model_name.lower() or "meta-llama/Llama-4-Scout" in model_name:
+            return "scout"
+        elif "llama-3.1" in model_name.lower():
+            return "llama3.1"
+        else:
+            return "other"
+    
+    def _get_target_modules(self) -> List[str]:
+        """Get appropriate target modules for LoRA based on model type."""
+        if self.model_type == "scout":
+            # Scout model has MoE architecture, may need different target modules
+            return ["q_proj", "k_proj", "v_proj", "o_proj",
+                   "gate_proj", "up_proj", "down_proj"]
+        else:
+            # Standard Llama target modules
+            return ["q_proj", "k_proj", "v_proj", "o_proj",
+                   "gate_proj", "up_proj", "down_proj"]
+    
+    @staticmethod
+    def get_model_path(model_name: str, custom_path: Optional[str] = None) -> str:
+        """Get the appropriate model path based on model name or custom path."""
+        if custom_path:
+            return custom_path
+            
+        model_paths = {
+            "llama3.1-8b": "unsloth/llama-3.1-8b-bnb-4bit",
+            "llama4-scout": "unsloth/Llama-4-Scout-17B-16E-Instruct-unsloth-bnb-4bit"
+        }
+        
+        return model_paths.get(model_name, model_name)
         
     def load_dataset(self, dataset_path: str) -> Dataset:
         """Load and prepare the memory dataset."""
@@ -485,23 +541,25 @@ class AdvancedMemoryTrainer:
                 print(f"⚠️ Warning: Low GPU memory ({gpu_memory['free']:.1f}GB free)")
                 self.vram_monitor.clear_cache()
             
-            # Load model with configuration
+            # Load model with configuration using Unsloth
+            # Both Llama 3.1 and Scout models should work with FastLanguageModel
             self.model, self.tokenizer = FastLanguageModel.from_pretrained(
                 model_name=self.model_name,
                 max_seq_length=config["max_seq_length"],
                 dtype=None,  # Auto-detect
                 load_in_4bit=True,  # Always use 4-bit for memory efficiency
+                trust_remote_code=True,  # Required for Scout model
             )
             
             if self.model is None or self.tokenizer is None:
                 raise RuntimeError("Failed to load model or tokenizer")
             
-            # Setup LoRA with configuration
+            # Setup LoRA with configuration using Unsloth
+            # Both models should work with FastLanguageModel.get_peft_model
             self.model = FastLanguageModel.get_peft_model(
                 self.model,
                 r=config["lora_rank"],
-                target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                              "gate_proj", "up_proj", "down_proj"],
+                target_modules=self.target_modules,
                 lora_alpha=config["lora_alpha"],
                 lora_dropout=0,  # Optimized for Unsloth
                 bias="none",    # Optimized for Unsloth
@@ -920,6 +978,15 @@ def parse_args():
                        help="Hugging Face token (or set HF_TOKEN environment variable)")
     parser.add_argument("--disable-plots", action="store_true",
                        help="Disable generation of training plots and visualizations")
+    
+    # Model selection arguments
+    parser.add_argument("--model-name", type=str, 
+                       choices=["llama3.1-8b", "llama4-scout"],
+                       default="llama3.1-8b",
+                       help="Model to fine-tune")
+    parser.add_argument("--model-path", type=str,
+                       help="Custom model path (overrides --model-name)")
+    
     return parser.parse_args()
 
 
@@ -939,10 +1006,15 @@ def main():
         print("🚀 Advanced Memory Fine-tuning with Hyperparameter Tuning")
         print("Based on Unsloth documentation and best practices")
         print(f"Dataset: {args.dataset_path}")
+        print(f"Model: {args.model_name}")
         print(f"Export formats: {args.export_formats or 'None'}")
         
+        # Get model path
+        model_path = AdvancedMemoryTrainer.get_model_path(args.model_name, args.model_path)
+        print(f"Model path: {model_path}")
+        
         # Initialize trainer
-        trainer = AdvancedMemoryTrainer(enable_plotting=not args.disable_plots)
+        trainer = AdvancedMemoryTrainer(model_name=model_path, enable_plotting=not args.disable_plots)
         
         if not args.skip_tuning:
             print("Phase 1: Hyperparameter Tuning")
