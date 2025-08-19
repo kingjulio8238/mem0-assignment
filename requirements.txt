@@ -1,6 +1,6 @@
 packaging
 wheel
-setuptools
+setuptools 
 mem0ai
 transformers>=4.51.0
 torch>=2.0.0 

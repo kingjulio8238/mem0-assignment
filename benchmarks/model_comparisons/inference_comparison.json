@@ -1,0 +1,75 @@
+{
+  "timestamp": "2025-08-19T08:18:47.286897",
+  "models": {
+    "base_model": {
+      "name": "Base Model (4-bit)",
+      "model_path": "unsloth/llama-3.1-8b-bnb-4bit",
+      "metrics": {
+        "average_latency": 6.978217892646789,
+        "median_latency": 7.026846170425415,
+        "p95_latency": 7.223238468170166,
+        "average_throughput": 18.141208984553074,
+        "median_throughput": 18.215853442007354,
+        "average_tokens_generated": 126.54,
+        "total_prompts": 50,
+        "success_rate": 1.0
+      }
+    },
+    "finetuned_bf16": {
+      "name": "Fine-tuned BF16",
+      "model_path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.BF16.gguf",
+      "metrics": {
+        "average_latency": 17.514206023216246,
+        "median_latency": 20.395874500274658,
+        "p95_latency": 21.844064474105835,
+        "average_throughput": 6.49866902382394,
+        "median_throughput": 6.605913481488512,
+        "average_tokens_generated": 115.02,
+        "total_prompts": 50,
+        "success_rate": 1.0
+      }
+    },
+    "finetuned_q4km": {
+      "name": "Fine-tuned Q4_K_M",
+      "model_path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.Q4_K_M.gguf",
+      "metrics": {
+        "average_latency": 7.364310693740845,
+        "median_latency": 8.005381345748901,
+        "p95_latency": 9.10502314567566,
+        "average_throughput": 16.147895015529315,
+        "median_throughput": 16.891484958121964,
+        "average_tokens_generated": 121.48,
+        "total_prompts": 50,
+        "success_rate": 1.0
+      }
+    }
+  },
+  "relative_performance": {
+    "finetuned_bf16": {
+      "latency_ratio": 2.5098393734124618,
+      "throughput_ratio": 0.3582268981828854,
+      "latency_change_percent": 150.9839373412462,
+      "throughput_change_percent": -64.17731018171146
+    },
+    "finetuned_q4km": {
+      "latency_ratio": 1.0553282810932139,
+      "throughput_ratio": 0.8901223192610244,
+      "latency_change_percent": 5.532828109321381,
+      "throughput_change_percent": -10.987768073897566
+    }
+  },
+  "statistical_analysis": {
+    "latency": {
+      "fastest_model": "base_model",
+      "slowest_model": "finetuned_bf16",
+      "speed_range": 10.535988130569457,
+      "coefficient_of_variation": 0.459393281682437
+    },
+    "throughput": {
+      "highest_throughput": "base_model",
+      "lowest_throughput": "finetuned_bf16",
+      "throughput_range": 11.642539960729135,
+      "coefficient_of_variation": 0.37394048990652234
+    }
+  }
+}

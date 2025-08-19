@@ -1,0 +1,99 @@
+{
+  "timestamp": "2025-08-19T08:18:47.287106",
+  "models": {
+    "base_model": {
+      "name": "Base Model (4-bit)",
+      "model_path": "unsloth/llama-3.1-8b-bnb-4bit",
+      "metrics": {
+        "average_precision_at_5": 0.4761904761904764,
+        "median_precision_at_5": 0.4,
+        "average_retrieval_time": 0.27933238801502047,
+        "median_retrieval_time": 0.25061821937561035,
+        "perfect_precision_queries": 1,
+        "zero_precision_queries": 2,
+        "total_queries": 21,
+        "success_rate": 1.0,
+        "precision_p95": 0.8
+      }
+    },
+    "finetuned_bf16": {
+      "name": "Fine-tuned BF16",
+      "model_path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.BF16.gguf",
+      "metrics": {
+        "average_precision_at_5": 0.4761904761904764,
+        "median_precision_at_5": 0.4,
+        "average_retrieval_time": 0.288430134455363,
+        "median_retrieval_time": 0.24853134155273438,
+        "perfect_precision_queries": 1,
+        "zero_precision_queries": 2,
+        "total_queries": 21,
+        "success_rate": 1.0,
+        "precision_p95": 0.8
+      }
+    },
+    "finetuned_q4km": {
+      "name": "Fine-tuned Q4_K_M",
+      "model_path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.Q4_K_M.gguf",
+      "metrics": {
+        "average_precision_at_5": 0.48571428571428593,
+        "median_precision_at_5": 0.4,
+        "average_retrieval_time": 0.22482521193368094,
+        "median_retrieval_time": 0.2014026641845703,
+        "perfect_precision_queries": 1,
+        "zero_precision_queries": 2,
+        "total_queries": 21,
+        "success_rate": 1.0,
+        "precision_p95": 0.8
+      }
+    }
+  },
+  "relative_performance": {
+    "finetuned_bf16": {
+      "precision_improvement": 0.0,
+      "precision_improvement_percent": 0.0,
+      "retrieval_time_ratio": 1.0325696082183398,
+      "retrieval_time_change_percent": 3.2569608218339834,
+      "perfect_queries_improvement": 0,
+      "zero_queries_change": 0
+    },
+    "finetuned_q4km": {
+      "precision_improvement": 0.009523809523809545,
+      "precision_improvement_percent": 2.000000000000004,
+      "retrieval_time_ratio": 0.8048662510327713,
+      "retrieval_time_change_percent": -19.513374896722873,
+      "perfect_queries_improvement": 0,
+      "zero_queries_change": 0
+    }
+  },
+  "statistical_analysis": {
+    "precision": {
+      "best_model": "finetuned_q4km",
+      "worst_model": "base_model",
+      "precision_range": 0.009523809523809545,
+      "mean_precision": 0.4793650793650796,
+      "std_precision": 0.004489566864676502
+    },
+    "retrieval_time": {
+      "fastest_model": "finetuned_q4km",
+      "slowest_model": "finetuned_bf16",
+      "time_range": 0.06360492252168204
+    }
+  },
+  "improvement_analysis": {
+    "expected_vs_actual": {
+      "expected_precision_threshold": 0.6,
+      "base_precision": 0.4761904761904764,
+      "bf16_precision": 0.4761904761904764,
+      "q4km_precision": 0.48571428571428593,
+      "bf16_meets_expectation": false,
+      "q4km_meets_expectation": false
+    },
+    "overall_assessment": {
+      "fine_tuning_effective": true,
+      "best_fine_tuned_model": "q4km",
+      "precision_improvement_achieved": true,
+      "quantization_impact": 0.009523809523809545,
+      "recommendation": "Q4_K_M recommended: Only model showing memory improvement"
+    }
+  }
+}
