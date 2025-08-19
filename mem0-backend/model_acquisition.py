@@ -21,6 +21,7 @@ class ModelAcquisition:
         self.cache_dir.mkdir(exist_ok=True)
         
         # Model configurations
+        # Llama 4 Scout: 16 experts, ~109B total params, 17B active, 10M context length
         self.llama4_scout_id = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
         self.instruct_8b_id = "unsloth/llama-3.1-8b-bnb-4bit"
         
@@ -173,7 +174,7 @@ class ModelAcquisition:
         results = {}
         
         # Determine which models to download
-        download_llama4 = "both" in models or "llama4" in models or "scout" in models
+        download_llama4 = "both" in models or "llama4" in models
         download_8b = "both" in models or "8b" in models or "instruct" in models
         
         if download_llama4:
@@ -258,7 +259,7 @@ Examples:
     parser.add_argument(
         "--models", 
         nargs="+", 
-        choices=["both", "8b", "instruct", "llama4", "scout"],
+        choices=["both", "8b", "instruct", "llama4"],
         default=["both"],
         help="Choose which models to download (default: both)"
     )

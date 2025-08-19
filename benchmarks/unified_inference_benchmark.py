@@ -50,9 +50,22 @@ class UnifiedInferenceBenchmark:
         """Load standard transformers model from HuggingFace or local path"""
         print(f"📥 Loading transformers model...")
         
+        # Handle HuggingFace cache directory structure for Llama 4 Scout
+        model_path = self.model_path
+        if "models--meta-llama--Llama-4-Scout" in model_path and os.path.isdir(model_path):
+            # Look for the actual model files in snapshots directory
+            snapshots_dir = os.path.join(model_path, "snapshots")
+            if os.path.exists(snapshots_dir):
+                # Find the latest snapshot
+                snapshot_dirs = [d for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
+                if snapshot_dirs:
+                    # Use the first (and likely only) snapshot
+                    model_path = os.path.join(snapshots_dir, snapshot_dirs[0])
+                    print(f"🔍 Using snapshot: {model_path}")
+        
         # Load tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_path, 
+            model_path, 
             trust_remote_code=True
         )
         if self.tokenizer.pad_token is None:
@@ -67,13 +80,24 @@ class UnifiedInferenceBenchmark:
         
         # Add quantization if specified
         if self.quantization == "4bit":
-            model_kwargs["load_in_4bit"] = True
+            from transformers import BitsAndBytesConfig
+            model_kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                llm_int8_enable_fp32_cpu_offload=True
+            )
         elif self.quantization == "8bit":
-            model_kwargs["load_in_8bit"] = True
+            from transformers import BitsAndBytesConfig
+            model_kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_8bit=True,
+                llm_int8_enable_fp32_cpu_offload=True
+            )
         
         # Load model
         self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_path,
+            model_path,
             **model_kwargs
         )
         
@@ -372,18 +396,53 @@ class UnifiedInferenceBenchmark:
         print(f"💾 Results saved to: {filename}")
         return filename
 
+def get_model_configs():
+    """Get predefined model configurations"""
+    return {
+        "llama-3.1-8b-bnb-4bit": {
+            "path": "unsloth/llama-3.1-8b-bnb-4bit",
+            "type": "transformers",
+            "quantization": "4bit"
+        },
+        "llama-3.1-bf16-gguf": {
+            "path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.BF16.gguf",
+            "type": "gguf",
+            "quantization": "bf16"
+        },
+        "llama-3.1-q4km-gguf": {
+            "path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.Q4_K_M.gguf",
+            "type": "gguf", 
+            "quantization": "4bit"
+        },
+        "llama-4-scout": {
+            "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
+            "type": "transformers",
+            "quantization": None
+        }
+    }
+
 def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description="Unified Inference Benchmark")
-    parser.add_argument("--model-path", type=str, required=True,
-                       help="Path to model (local path or HuggingFace repo)")
+    
+    # Model selection - either predefined or custom
+    model_group = parser.add_mutually_exclusive_group(required=True)
+    model_group.add_argument("--model", type=str, 
+                           choices=list(get_model_configs().keys()),
+                           help="Predefined model to benchmark")
+    model_group.add_argument("--model-path", type=str,
+                           help="Custom path to model (local path or HuggingFace repo)")
+    
+    # Model configuration (only used with --model-path)
     parser.add_argument("--model-type", type=str, 
                        choices=["transformers", "gguf", "local"],
                        default="transformers",
-                       help="Type of model to load")
+                       help="Type of model to load (only used with --model-path)")
     parser.add_argument("--quantization", type=str,
                        choices=["4bit", "8bit", "bf16", None],
-                       help="Quantization method")
+                       help="Quantization method (only used with --model-path)")
+    
+    # Benchmark configuration
     parser.add_argument("--num-prompts", type=int, default=50,
                        help="Number of prompts to benchmark")
     parser.add_argument("--output-dir", type=str,
@@ -397,18 +456,40 @@ def main():
     args = parse_args()
     
     try:
+        # Determine model configuration
+        if args.model:
+            # Use predefined model configuration
+            model_configs = get_model_configs()
+            config = model_configs[args.model]
+            model_path = config["path"]
+            model_type = config["type"]
+            quantization = config["quantization"]
+            print(f"🎯 Using predefined model: {args.model}")
+        else:
+            # Use custom model configuration
+            model_path = args.model_path
+            model_type = args.model_type
+            quantization = args.quantization
+            print(f"🎯 Using custom model: {model_path}")
+        
+        # Set output directory based on model
+        if args.model == "llama-4-scout":
+            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
+        else:
+            output_dir = args.output_dir
+        
         # Initialize benchmark
         benchmark = UnifiedInferenceBenchmark(
-            model_path=args.model_path,
-            model_type=args.model_type,
-            quantization=args.quantization
+            model_path=model_path,
+            model_type=model_type,
+            quantization=quantization
         )
         
         # Run benchmark
         results = benchmark.run_benchmark(num_prompts=args.num_prompts)
         
         # Save results
-        results_file = benchmark.save_results(results, args.output_dir)
+        results_file = benchmark.save_results(results, output_dir)
         
         # Print summary
         if 'summary' in results and results['summary']:
@@ -416,8 +497,8 @@ def main():
             print("\n" + "="*60)
             print("🎯 INFERENCE BENCHMARK SUMMARY")
             print("="*60)
-            print(f"Model: {args.model_path}")
-            print(f"Type: {args.model_type} | Quantization: {args.quantization or 'None'}")
+            print(f"Model: {model_path}")
+            print(f"Type: {model_type} | Quantization: {quantization or 'None'}")
             print(f"Successful prompts: {summary['successful_prompts']}/{args.num_prompts}")
             print(f"Average latency: {summary['average_latency']:.3f}s")
             print(f"Median latency: {summary['median_latency']:.3f}s")

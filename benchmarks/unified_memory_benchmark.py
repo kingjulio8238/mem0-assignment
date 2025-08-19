@@ -356,15 +356,50 @@ class UnifiedMemoryBenchmark:
         except Exception as e:
             print(f"⚠️ Warning: Could not clean up memories: {e}")
 
+def get_model_configs():
+    """Get predefined model configurations"""
+    return {
+        "llama-3.1-8b-bnb-4bit": {
+            "path": "unsloth/llama-3.1-8b-bnb-4bit",
+            "type": "transformers",
+            "quantization": "4bit"
+        },
+        "llama-3.1-bf16-gguf": {
+            "path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.BF16.gguf",
+            "type": "gguf",
+            "quantization": "bf16"
+        },
+        "llama-3.1-q4km-gguf": {
+            "path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.Q4_K_M.gguf",
+            "type": "gguf", 
+            "quantization": "4bit"
+        },
+        "llama-4-scout": {
+            "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
+            "type": "transformers",
+            "quantization": None
+        }
+    }
+
 def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description="Unified Memory Retrieval Benchmark")
-    parser.add_argument("--model-path", type=str,
-                       help="Path to model being tested (for reference)")
+    
+    # Model selection - either predefined or custom
+    model_group = parser.add_mutually_exclusive_group()
+    model_group.add_argument("--model", type=str, 
+                           choices=list(get_model_configs().keys()),
+                           help="Predefined model to benchmark")
+    model_group.add_argument("--model-path", type=str,
+                           help="Custom path to model being tested (for reference)")
+    
+    # Model configuration (only used with --model-path)
     parser.add_argument("--model-type", type=str, 
                        choices=["transformers", "gguf", "local"],
                        default="transformers",
-                       help="Type of model being tested")
+                       help="Type of model being tested (only used with --model-path)")
+    
+    # Benchmark configuration
     parser.add_argument("--output-dir", type=str,
                        default="/home/ubuntu/mem0-assignment/benchmarks",
                        help="Output directory for results")
@@ -378,10 +413,33 @@ def main():
     args = parse_args()
     
     try:
+        # Determine model configuration
+        if args.model:
+            # Use predefined model configuration
+            model_configs = get_model_configs()
+            config = model_configs[args.model]
+            model_path = config["path"]
+            model_type = config["type"]
+            print(f"🎯 Using predefined model: {args.model}")
+        else:
+            # Use custom model configuration or default
+            model_path = args.model_path
+            model_type = args.model_type
+            if model_path:
+                print(f"🎯 Using custom model: {model_path}")
+            else:
+                print("🎯 Using default memory benchmark (no specific model)")
+        
+        # Set output directory based on model
+        if args.model == "llama-4-scout":
+            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
+        else:
+            output_dir = args.output_dir
+        
         # Initialize benchmark
         benchmark = UnifiedMemoryBenchmark(
-            model_path=args.model_path,
-            model_type=args.model_type
+            model_path=model_path,
+            model_type=model_type
         )
         
         # Load synthetic memories and add them to Mem0
@@ -400,7 +458,7 @@ def main():
         results = benchmark.run_retrieval_benchmark(queries)
         
         # Save results
-        results_file = benchmark.save_results(results, args.output_dir)
+        results_file = benchmark.save_results(results, output_dir)
         
         # Print summary
         if 'summary' in results and 'successful_queries' in results['summary']:
@@ -408,8 +466,8 @@ def main():
             print("\n" + "="*70)
             print("🧠 MEMORY RETRIEVAL BENCHMARK SUMMARY")
             print("="*70)
-            print(f"Model: {args.model_path or 'Default'}")
-            print(f"Type: {args.model_type}")
+            print(f"Model: {model_path or 'Default'}")
+            print(f"Type: {model_type}")
             print(f"Synthetic memories added: {added_count}")
             print(f"Successful queries: {summary['successful_queries']}/{summary['num_queries']}")
             

@@ -1,25 +1,49 @@
 from mem0 import Memory
 import os
 import torch
+import argparse
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Setup for local Llama model without Ollama
-model_path = "unsloth/llama-3.1-8b-bnb-4bit"
+# Available models
+MODELS = {
+    "llama3.1": "unsloth/llama-3.1-8b-bnb-4bit",
+    "llama4": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct/snapshots/92f3b1597a195b523d8d9e5700e57e4fbb8f20d3"
+}
 
-# Load the model and tokenizer
-print("Loading Llama 3.1 8B model...")
-tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-if tokenizer.pad_token is None:
-    tokenizer.pad_token = tokenizer.eos_token
+def load_model(model_choice):
+    """Load the specified model and tokenizer"""
+    model_path = MODELS[model_choice]
+    model_name = "Llama 3.1 8B" if model_choice == "llama3.1" else "Llama 4 Scout 17B"
+    
+    print(f"Loading {model_name} model from: {model_path}")
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
 
-model = AutoModelForCausalLM.from_pretrained(
-    model_path,
-    device_map="auto",
-    torch_dtype=torch.bfloat16,
-    trust_remote_code=True,
-    load_in_4bit=True
-)
-print(f"Model loaded on device: {next(model.parameters()).device}")
+    # Load model with appropriate settings
+    load_kwargs = {
+        "device_map": "auto",
+        "torch_dtype": torch.bfloat16,
+        "trust_remote_code": True,
+    }
+    
+    # Use 4-bit quantization for Llama 3.1, regular loading for Llama 4
+    if model_choice == "llama3.1":
+        load_kwargs["load_in_4bit"] = True
+    
+    model = AutoModelForCausalLM.from_pretrained(model_path, **load_kwargs)
+    print(f"Model loaded on device: {next(model.parameters()).device}")
+    
+    return model, tokenizer
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description="Test Mem0 with different Llama models")
+parser.add_argument("--model", choices=["llama3.1", "llama4"], default="llama3.1",
+                   help="Choose which model to use (default: llama3.1)")
+args = parser.parse_args()
+
+# Load the selected model
+model, tokenizer = load_model(args.model)
 
 # Initialize Mem0 memory instance with default configuration
 # Using default config since it works perfectly for our needs
@@ -80,8 +104,9 @@ def chat_with_memory(user_input, user_id="alice"):
     return response
 
 if __name__ == "__main__":
+    model_name = "Llama 3.1 8B" if args.model == "llama3.1" else "Llama 4 Scout 17B"
     print("="*50)
-    print("Testing Mem0 with Local Llama 3.1 8B Model")
+    print(f"Testing Mem0 with Local {model_name} Model")
     print("="*50)
     
     # Test 1: Basic memory add
