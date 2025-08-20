@@ -379,6 +379,11 @@ def get_model_configs():
             "type": "transformers",
             "quantization": None
         },
+        "llama-4-scout-bf16": {
+            "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
+            "type": "transformers",
+            "quantization": "bf16"
+        },
         "llama-4-scout-gguf-q4km": {
             "path": "/home/ubuntu/mem0-assignment/model_cache/scout_gguf/Q4_K_M",
             "type": "gguf",
@@ -441,7 +446,7 @@ def main():
                 print("🎯 Using default memory benchmark (no specific model)")
         
         # Set output directory based on model
-        if args.model == "llama-4-scout" or args.model == "llama-4-scout-gguf-q4km" or args.model == "llama4-gguf":
+        if args.model in ["llama-4-scout", "llama-4-scout-bf16", "llama-4-scout-gguf-q4km", "llama4-gguf"]:
             output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
         else:
             output_dir = args.output_dir

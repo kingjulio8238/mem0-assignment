@@ -75,12 +75,17 @@ class UnifiedInferenceBenchmark:
         model_kwargs = {
             "device_map": "auto",
             "trust_remote_code": True,
-            "torch_dtype": torch.bfloat16
+            "low_cpu_mem_usage": True
         }
         
-        # Add quantization if specified
-        if self.quantization == "4bit":
+        # Set torch dtype and quantization based on configuration
+        if self.quantization == "bf16":
+            model_kwargs["torch_dtype"] = torch.bfloat16
+        elif self.quantization == "fp16":
+            model_kwargs["torch_dtype"] = torch.float16
+        elif self.quantization == "4bit":
             from transformers import BitsAndBytesConfig
+            model_kwargs["torch_dtype"] = torch.bfloat16
             model_kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_compute_dtype=torch.bfloat16,
@@ -90,10 +95,14 @@ class UnifiedInferenceBenchmark:
             )
         elif self.quantization == "8bit":
             from transformers import BitsAndBytesConfig
+            model_kwargs["torch_dtype"] = torch.bfloat16
             model_kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_8bit=True,
                 llm_int8_enable_fp32_cpu_offload=True
             )
+        else:
+            # Default to bfloat16 for no quantization
+            model_kwargs["torch_dtype"] = torch.bfloat16
         
         # Load model
         self.model = AutoModelForCausalLM.from_pretrained(
@@ -417,7 +426,12 @@ def get_model_configs():
         "llama-4-scout": {
             "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
             "type": "transformers",
-            "quantization": "4bit"
+            "quantization": None
+        },
+        "llama-4-scout-bf16": {
+            "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
+            "type": "transformers",
+            "quantization": "bf16"
         },
         "llama-4-scout-gguf-q4km": {
             "path": "/home/ubuntu/mem0-assignment/model_cache/scout_gguf/Q4_K_M",
@@ -478,7 +492,7 @@ def main():
             print(f"🎯 Using custom model: {model_path}")
         
         # Set output directory based on model
-        if args.model == "llama-4-scout":
+        if args.model in ["llama-4-scout", "llama-4-scout-bf16"]:
             output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
         else:
             output_dir = args.output_dir

@@ -48,6 +48,9 @@ class ScoutTrainingConfig:
     dataset_path: str = "./finetune/memory_dataset.jsonl"
     output_dir: str = "./scout_finetuned_model"
     
+    # Training mode
+    training_mode: str = "fp16"  # "fp16", "4bit", or "comparison"
+    
     # LoRA parameters
     lora_rank: int = 16
     lora_alpha: int = 32
@@ -68,8 +71,12 @@ class ScoutTrainingConfig:
     eval_steps: int = 500
     logging_steps: int = 10
     
-    # Quantization
-    use_4bit: bool = True
+    # Precision settings
+    use_fp16: bool = False
+    use_bf16: bool = True
+    
+    # Quantization (for 4bit mode)
+    use_4bit: bool = False
     bnb_4bit_compute_dtype: str = "bfloat16"
     bnb_4bit_quant_type: str = "nf4"
     use_nested_quant: bool = True
@@ -77,6 +84,10 @@ class ScoutTrainingConfig:
     # Export
     export_gguf: bool = True
     gguf_quantization: str = "q4_k_m"
+    merge_adapters: bool = True
+    
+    # Comparison mode
+    compare_precision: bool = False
 
 
 class MemoryMonitor:
@@ -161,19 +172,26 @@ class MemoryMonitor:
             torch.cuda.empty_cache()
             gc.collect()
             
-    def estimate_memory_for_config(self, lora_rank: int, batch_size: int) -> float:
+    def estimate_memory_for_config(self, lora_rank: int, batch_size: int, use_4bit: bool = True) -> float:
         """Estimate memory usage for given config"""
-        # Base model memory (17B params in 4-bit ≈ 10-12GB)
-        base_memory = 12.0
+        if use_4bit:
+            # Base model memory (17B params in 4-bit ≈ 10-12GB)
+            base_memory = 12.0
+        else:
+            # Base model memory (17B params in FP16 ≈ 34GB)
+            base_memory = 34.0
         
         # LoRA memory (roughly proportional to rank)
         lora_memory = (lora_rank / 16) * 2.0  # 2GB for rank 16
         
         # Batch size memory (activations)
-        batch_memory = batch_size * 1.5  # 1.5GB per batch
+        if use_4bit:
+            batch_memory = batch_size * 1.5  # 1.5GB per batch for 4-bit
+        else:
+            batch_memory = batch_size * 3.0  # 3GB per batch for FP16
         
         # Safety buffer
-        buffer = 3.0
+        buffer = 5.0 if use_4bit else 8.0
         
         return base_memory + lora_memory + batch_memory + buffer
 
@@ -216,17 +234,23 @@ class HyperparameterTuner:
     def __init__(self, memory_monitor: MemoryMonitor):
         self.memory_monitor = memory_monitor
         
-    def generate_configs(self, max_trials: int = 5) -> List[Dict]:
+    def generate_configs(self, max_trials: int = 5, use_4bit: bool = True, training_mode: str = "4bit") -> List[Dict]:
         """Generate feasible hyperparameter configurations based on available VRAM"""
         configs = []
         
-        # Define search space
-        lora_ranks = [4, 8, 16, 32]
-        batch_sizes = [1, 2, 4]
-        learning_rates = [1e-4, 2e-4, 5e-4, 1e-3]
-        gradient_accumulations = [16, 32, 64]
+        # Define search space based on training mode
+        if training_mode == "fp16":
+            lora_ranks = [4, 8, 16]  # Lower ranks for FP16 due to memory constraints
+            batch_sizes = [1, 2]     # Smaller batch sizes for FP16
+            learning_rates = [1e-4, 2e-4, 5e-4]
+            gradient_accumulations = [32, 64, 128]  # Higher accumulation for FP16
+        else:  # 4bit mode
+            lora_ranks = [4, 8, 16, 32]
+            batch_sizes = [1, 2, 4]
+            learning_rates = [1e-4, 2e-4, 5e-4, 1e-3]
+            gradient_accumulations = [16, 32, 64]
         
-        print("🔍 Generating hyperparameter configurations...")
+        print(f"🔍 Generating hyperparameter configurations for {training_mode} mode...")
         available_vram = self.memory_monitor.get_available_vram()
         print(f"Available VRAM: {available_vram:.2f}GB")
         
@@ -238,7 +262,9 @@ class HyperparameterTuner:
                         attempted += 1
                         
                         # Estimate memory usage
-                        estimated_memory = self.memory_monitor.estimate_memory_for_config(lora_rank, batch_size)
+                        estimated_memory = self.memory_monitor.estimate_memory_for_config(
+                            lora_rank, batch_size, use_4bit=use_4bit
+                        )
                         
                         if estimated_memory <= available_vram and len(configs) < max_trials:
                             config = {
@@ -247,7 +273,8 @@ class HyperparameterTuner:
                                 'batch_size': batch_size,
                                 'gradient_accumulation_steps': grad_acc,
                                 'learning_rate': lr,
-                                'estimated_memory': estimated_memory
+                                'estimated_memory': estimated_memory,
+                                'training_mode': training_mode
                             }
                             configs.append(config)
                             print(f"✅ Config {len(configs)}: Rank={lora_rank}, BS={batch_size}, LR={lr:.1e}, GA={grad_acc}, Est. Mem={estimated_memory:.1f}GB")
@@ -264,13 +291,15 @@ class HyperparameterTuner:
         if not configs:
             # Fallback to minimal config
             print("⚠️ No configs fit in available VRAM, using minimal config")
+            fallback_memory = 15.0 if use_4bit else 45.0
             configs = [{
                 'lora_rank': 4,
                 'lora_alpha': 8,
                 'batch_size': 1,
-                'gradient_accumulation_steps': 16,
+                'gradient_accumulation_steps': 32 if training_mode == "fp16" else 16,
                 'learning_rate': 2e-4,
-                'estimated_memory': 15.0
+                'estimated_memory': fallback_memory,
+                'training_mode': training_mode
             }]
         
         print(f"Generated {len(configs)} feasible configurations from {attempted} attempts")
@@ -294,6 +323,9 @@ class Llama4ScoutTrainer:
         self.memory_monitor = MemoryMonitor()
         self.tuner = HyperparameterTuner(self.memory_monitor)
         
+        # Configure training mode settings
+        self._configure_training_mode()
+        
         # Initialize accelerator
         self.accelerator = Accelerator(
             gradient_accumulation_steps=config.gradient_accumulation_steps,
@@ -310,6 +342,25 @@ class Llama4ScoutTrainer:
         self.tuning_results = []
         self.best_config = None
         self.best_loss = float('inf')
+        
+        # For comparison mode
+        self.comparison_results = {}
+        
+    def _configure_training_mode(self):
+        """Configure settings based on training mode"""
+        if self.config.training_mode == "fp16":
+            self.config.use_4bit = False
+            self.config.use_fp16 = True
+            self.config.use_bf16 = False
+        elif self.config.training_mode == "4bit":
+            self.config.use_4bit = True
+            self.config.use_fp16 = False
+            self.config.use_bf16 = True
+        elif self.config.training_mode == "comparison":
+            # Will be set dynamically during comparison
+            pass
+        else:
+            raise ValueError(f"Unknown training mode: {self.config.training_mode}")
         
     def load_dataset(self) -> Dataset:
         """Load and preprocess the training dataset"""
@@ -332,13 +383,14 @@ class Llama4ScoutTrainer:
         return dataset
     
     def setup_model_and_tokenizer(self):
-        """Setup the model and tokenizer with quantization"""
+        """Setup the model and tokenizer with proper precision settings"""
         print(f"🚀 Loading Llama 4 Scout model from {self.config.model_path}")
+        print(f"Training mode: {self.config.training_mode}")
         
         self.memory_monitor.log_memory_usage("Before Model Loading")
         
-        # Setup quantization config
-        if self.config.use_4bit:
+        # Setup quantization config for 4-bit mode
+        if self.config.use_4bit and self.config.training_mode in ["4bit", "comparison"]:
             bnb_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_quant_type=self.config.bnb_4bit_quant_type,
@@ -369,30 +421,48 @@ class Llama4ScoutTrainer:
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         
         # Load model with progress indicator
-        progress.start("🦙 Loading Llama 4 Scout model (17B params, this may take 5-10 minutes)")
+        mode_desc = "FP16" if self.config.training_mode == "fp16" else "4-bit quantized"
+        progress.start(f"🦙 Loading Llama 4 Scout model ({mode_desc}, 17B params, this may take 5-10 minutes)")
+        
+        # Determine torch dtype based on training mode
+        if self.config.training_mode == "fp16":
+            torch_dtype = torch.float16
+        else:
+            torch_dtype = torch.bfloat16
         
         try:
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.config.model_path,
                 quantization_config=bnb_config,
                 device_map="auto",
-                torch_dtype=torch.bfloat16,
+                torch_dtype=torch_dtype,
                 trust_remote_code=True,
-                attn_implementation="eager"  # Use eager attention for Llama 4
+                attn_implementation="eager",  # Use eager attention for Llama 4
+                low_cpu_mem_usage=True,
             )
         finally:
             progress.stop()
         
         print("✅ Model loaded successfully")
         
-        # Prepare model for training
-        if self.config.use_4bit:
+        # Prepare model for training based on mode
+        if self.config.use_4bit and self.config.training_mode in ["4bit", "comparison"]:
             progress.start("🔧 Preparing model for 4-bit training")
             try:
                 self.model = prepare_model_for_kbit_training(self.model)
             finally:
                 progress.stop()
             print("✅ Model prepared for 4-bit training")
+        elif self.config.training_mode == "fp16":
+            progress.start("🔧 Preparing model for FP16 training")
+            try:
+                # Enable gradient checkpointing for FP16 training
+                self.model.gradient_checkpointing_enable()
+                # Ensure model is in training mode
+                self.model.train()
+            finally:
+                progress.stop()
+            print("✅ Model prepared for FP16 training")
         
         self.memory_monitor.log_memory_usage("After Model Loading")
         
@@ -493,7 +563,7 @@ class Llama4ScoutTrainer:
         print(f"Training set: {len(train_dataset)} examples")
         print(f"Evaluation set: {len(eval_dataset)} examples")
         
-        # Setup training arguments
+        # Setup training arguments with proper precision settings
         training_args = TrainingArguments(
             output_dir=self.config.output_dir,
             per_device_train_batch_size=self.config.batch_size,
@@ -513,10 +583,13 @@ class Llama4ScoutTrainer:
             report_to="tensorboard",
             remove_unused_columns=False,
             dataloader_pin_memory=False,
-            bf16=True,
+            fp16=self.config.use_fp16 or self.config.training_mode == "fp16",
+            bf16=self.config.use_bf16 and self.config.training_mode != "fp16",
             gradient_checkpointing=True,
             optim="adamw_torch",
             lr_scheduler_type="cosine",
+            ddp_find_unused_parameters=False,  # Optimize for multi-GPU
+            max_grad_norm=1.0,  # Gradient clipping
         )
         
         # Data collator
@@ -612,10 +685,12 @@ class Llama4ScoutTrainer:
                 report_to=None,  # Disable reporting for trials
                 remove_unused_columns=False,
                 dataloader_pin_memory=False,
-                bf16=True,
+                fp16=self.config.use_fp16 or self.config.training_mode == "fp16",
+                bf16=self.config.use_bf16 and self.config.training_mode != "fp16",
                 gradient_checkpointing=True,
                 optim="adamw_torch",
                 lr_scheduler_type="cosine",
+                max_grad_norm=1.0,
             )
             
             # Data collator
@@ -678,15 +753,16 @@ class Llama4ScoutTrainer:
             self.memory_monitor.clear_cache()
     
     def run_hyperparameter_tuning(self, max_trials: int = 5) -> Dict:
-        """Run hyperparameter tuning"""
-        print("🎯 Starting Hyperparameter Tuning Phase")
+        """Run hyperparameter tuning for current training mode"""
+        print(f"🎯 Starting Hyperparameter Tuning Phase - {self.config.training_mode.upper()} Mode")
         print("💡 Note: Model will be loaded fresh for each trial to ensure accurate memory measurements")
         
-        # Generate configurations
-        configs = self.tuner.generate_configs(max_trials)
+        # Generate configurations based on training mode
+        use_4bit = self.config.training_mode in ["4bit", "comparison"]
+        configs = self.tuner.generate_configs(max_trials, use_4bit=use_4bit, training_mode=self.config.training_mode)
         
         if not configs:
-            raise RuntimeError("No feasible configurations found for available VRAM")
+            raise RuntimeError(f"No feasible configurations found for {self.config.training_mode} mode with available VRAM")
         
         # Load dataset once (lightweight operation)
         print("📚 Loading dataset for hyperparameter tuning...")
@@ -694,7 +770,7 @@ class Llama4ScoutTrainer:
         
         results = []
         for i, config in enumerate(configs):
-            trial_name = f"trial_{i+1:02d}"
+            trial_name = f"{self.config.training_mode}_trial_{i+1:02d}"
             result = self.train_with_config(config, trial_name)
             results.append(result)
             
@@ -710,7 +786,7 @@ class Llama4ScoutTrainer:
         self.save_tuning_results(results)
         
         # Print summary
-        print("\n📊 Hyperparameter Tuning Results:")
+        print(f"\n📊 Hyperparameter Tuning Results ({self.config.training_mode.upper()}):")
         for result in results:
             print(f"  {result['trial_name']}: Loss={result['final_loss']:.4f}, "
                   f"Memory={result['peak_memory']:.1f}GB, "
@@ -719,42 +795,114 @@ class Llama4ScoutTrainer:
         return {
             'results': results,
             'best_config': self.best_config,
-            'best_loss': self.best_loss
+            'best_loss': self.best_loss,
+            'training_mode': self.config.training_mode
         }
     
     def save_tuning_results(self, results: List[Dict]):
-        """Save tuning results to file"""
+        """Save tuning results to file with training mode info"""
         output_dir = Path(f"{self.config.output_dir}/scout_trials")
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        results_file = output_dir / "tuning_results.json"
+        results_file = output_dir / f"tuning_results_{self.config.training_mode}.json"
+        
+        # Add metadata to results
+        results_data = {
+            'training_mode': self.config.training_mode,
+            'timestamp': time.time(),
+            'model_path': self.config.model_path,
+            'dataset_path': self.config.dataset_path,
+            'results': results,
+            'best_config': self.best_config,
+            'best_loss': self.best_loss
+        }
+        
         with open(results_file, 'w') as f:
-            json.dump(results, f, indent=2)
+            json.dump(results_data, f, indent=2)
         
         print(f"💾 Tuning results saved to {results_file}")
     
-    def export_gguf(self, trainer):
-        """Export model to GGUF format"""
+    def export_gguf(self, trainer, suffix=""):
+        """Export model to GGUF format with proper merging"""
         if not self.config.export_gguf:
             return
             
-        print("\n📦 Exporting to GGUF format...")
+        print(f"\n📦 Exporting to GGUF format{suffix}...")
         try:
-            # First save in HF format
-            merged_model = trainer.model.merge_and_unload()
-            gguf_output_dir = f"{self.config.output_dir}_gguf"
+            # Merge and unload LoRA adapters
+            if self.config.merge_adapters:
+                print("🔧 Merging LoRA adapters...")
+                merged_model = trainer.model.merge_and_unload()
+            else:
+                merged_model = trainer.model
             
-            # Save merged model
-            merged_model.save_pretrained(gguf_output_dir)
+            # Create output directory
+            gguf_output_dir = f"{self.config.output_dir}_gguf{suffix}"
+            os.makedirs(gguf_output_dir, exist_ok=True)
+            
+            # Save merged model and tokenizer
+            print("💾 Saving merged model...")
+            merged_model.save_pretrained(
+                gguf_output_dir,
+                safe_serialization=True,
+                max_shard_size="5GB"
+            )
             self.tokenizer.save_pretrained(gguf_output_dir)
             
+            # Create model card
+            model_card_content = f"""---
+license: llama2
+base_model: {self.config.model_path}
+training_mode: {self.config.training_mode}
+lora_rank: {self.config.lora_rank}
+lora_alpha: {self.config.lora_alpha}
+learning_rate: {self.config.learning_rate}
+batch_size: {self.config.batch_size}
+---
+
+# Llama 4 Scout Fine-tuned Model
+
+This model was fine-tuned using LoRA on a memory dataset.
+
+## Training Configuration
+- Mode: {self.config.training_mode}
+- LoRA Rank: {self.config.lora_rank}
+- Learning Rate: {self.config.learning_rate}
+- Batch Size: {self.config.batch_size}
+
+## Usage
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model = AutoModelForCausalLM.from_pretrained("{gguf_output_dir}")
+tokenizer = AutoTokenizer.from_pretrained("{gguf_output_dir}")
+```
+
+## GGUF Conversion
+
+To convert to GGUF format:
+
+```bash
+python -m llama_cpp.convert {gguf_output_dir}
+```
+"""
+            
+            with open(f"{gguf_output_dir}/README.md", "w") as f:
+                f.write(model_card_content)
+            
             print(f"✅ Model saved for GGUF conversion at {gguf_output_dir}")
-            print("💡 To convert to GGUF, use:")
+            print("💡 To convert to GGUF format:")
             print(f"   python -m llama_cpp.convert {gguf_output_dir}")
+            print(f"   # Or use llama.cpp quantization:")
+            print(f"   ./quantize {gguf_output_dir}/model.gguf {gguf_output_dir}/model-{self.config.gguf_quantization}.gguf {self.config.gguf_quantization}")
+            
+            return gguf_output_dir
             
         except Exception as e:
             print(f"❌ GGUF export failed: {str(e)}")
             print("💡 You can manually convert using llama.cpp tools")
+            return None
 
 
 def parse_args():
@@ -785,43 +933,195 @@ def parse_args():
                        help="Maximum number of hyperparameter tuning trials")
     parser.add_argument("--skip-tuning", action="store_true",
                        help="Skip hyperparameter tuning and use default config")
+    parser.add_argument("--training-mode", type=str, default="auto", 
+                       choices=["fp16", "4bit", "comparison", "auto"],
+                       help="Training mode: fp16, 4bit, comparison, or auto")
     
     return parser.parse_args()
+
+
+    def run_comparison_training(self, max_trials: int = 3):
+        """Run comparison training between FP16 and 4-bit modes"""
+        print("🔄 Starting Comparison Training: FP16 vs 4-bit QLoRA")
+        
+        modes = ["fp16", "4bit"]
+        comparison_results = {}
+        
+        for mode in modes:
+            print(f"\n{'='*50}")
+            print(f"🎯 Training with {mode.upper()} precision")
+            print(f"{'='*50}")
+            
+            # Configure for this mode
+            original_mode = self.config.training_mode
+            self.config.training_mode = mode
+            self._configure_training_mode()
+            
+            # Reset best config tracking for this mode
+            self.best_config = None
+            self.best_loss = float('inf')
+            
+            try:
+                # Run hyperparameter tuning for this mode
+                tuning_results = self.run_hyperparameter_tuning(max_trials)
+                
+                # Train final model with best config
+                best_config = tuning_results['best_config']
+                self.config.lora_rank = best_config['lora_rank']
+                self.config.lora_alpha = best_config['lora_alpha']
+                self.config.batch_size = best_config['batch_size']
+                self.config.gradient_accumulation_steps = best_config['gradient_accumulation_steps']
+                self.config.learning_rate = best_config['learning_rate']
+                
+                # Set output directory for this mode
+                original_output = self.config.output_dir
+                self.config.output_dir = f"{original_output}_{mode}"
+                
+                print(f"\n🚀 Final training for {mode.upper()} mode...")
+                trainer = self.train()
+                
+                # Export model
+                if self.config.export_gguf:
+                    gguf_path = self.export_gguf(trainer, f"_{mode}")
+                
+                # Store results
+                comparison_results[mode] = {
+                    'tuning_results': tuning_results,
+                    'best_config': best_config,
+                    'best_loss': tuning_results['best_loss'],
+                    'output_dir': self.config.output_dir,
+                    'gguf_path': gguf_path if self.config.export_gguf else None
+                }
+                
+                # Restore original output directory
+                self.config.output_dir = original_output
+                
+            except Exception as e:
+                print(f"❌ Error training {mode} mode: {str(e)}")
+                comparison_results[mode] = {'error': str(e)}
+            
+            # Clean up memory
+            if self.model is not None:
+                del self.model
+                self.model = None
+                self.memory_monitor.clear_cache()
+        
+        # Restore original mode
+        self.config.training_mode = original_mode
+        self.comparison_results = comparison_results
+        
+        # Save comparison results
+        self._save_comparison_results(comparison_results)
+        
+        # Print comparison summary
+        self._print_comparison_summary(comparison_results)
+        
+        return comparison_results
+    
+    def _save_comparison_results(self, results: Dict):
+        """Save comparison results to file"""
+        output_dir = Path(f"{self.config.output_dir}/comparison")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        results_file = output_dir / "fp16_vs_4bit_comparison.json"
+        
+        comparison_data = {
+            'timestamp': time.time(),
+            'model_path': self.config.model_path,
+            'dataset_path': self.config.dataset_path,
+            'results': results
+        }
+        
+        with open(results_file, 'w') as f:
+            json.dump(comparison_data, f, indent=2)
+        
+        print(f"💾 Comparison results saved to {results_file}")
+    
+    def _print_comparison_summary(self, results: Dict):
+        """Print comparison summary"""
+        print("\n" + "="*60)
+        print("📊 COMPARISON SUMMARY: FP16 vs 4-bit QLoRA")
+        print("="*60)
+        
+        for mode, result in results.items():
+            if 'error' in result:
+                print(f"{mode.upper()}: ❌ Failed - {result['error']}")
+            else:
+                print(f"\n{mode.upper()} Results:")
+                print(f"  Best Loss: {result['best_loss']:.4f}")
+                print(f"  Best Config: {result['best_config']}")
+                print(f"  Output Dir: {result['output_dir']}")
+                if result.get('gguf_path'):
+                    print(f"  GGUF Path: {result['gguf_path']}")
+        
+        # Performance comparison
+        if 'fp16' in results and '4bit' in results:
+            if 'error' not in results['fp16'] and 'error' not in results['4bit']:
+                fp16_loss = results['fp16']['best_loss']
+                bit4_loss = results['4bit']['best_loss']
+                
+                print(f"\n🏆 Performance Comparison:")
+                if fp16_loss < bit4_loss:
+                    improvement = ((bit4_loss - fp16_loss) / bit4_loss) * 100
+                    print(f"  FP16 outperforms 4-bit by {improvement:.2f}% (lower loss)")
+                elif bit4_loss < fp16_loss:
+                    improvement = ((fp16_loss - bit4_loss) / fp16_loss) * 100
+                    print(f"  4-bit outperforms FP16 by {improvement:.2f}% (lower loss)")
+                else:
+                    print(f"  Performance is roughly equivalent")
+                
+                print(f"  FP16 Loss: {fp16_loss:.4f}")
+                print(f"  4-bit Loss: {bit4_loss:.4f}")
 
 
 def main():
     """Main training function"""
     args = parse_args()
     
+    # Determine training mode from arguments
+    if args.training_mode == "comparison":
+        training_mode = "comparison"
+    elif args.no_4bit:
+        training_mode = "fp16"
+    else:
+        training_mode = "4bit"
+    
     # Create config
     config = ScoutTrainingConfig(
         model_path=args.model_path,
         dataset_path=args.dataset_path,
         output_dir=args.output_dir,
+        training_mode=training_mode,
         lora_rank=args.lora_rank,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
         num_epochs=args.num_epochs,
         max_seq_length=args.max_seq_length,
         export_gguf=args.export_gguf,
-        use_4bit=not args.no_4bit,
     )
     
     print("🦙 Llama 4 Scout Fine-tuning with Accelerate")
     print(f"Model: {config.model_path}")
     print(f"Dataset: {config.dataset_path}")
     print(f"Output: {config.output_dir}")
+    print(f"Training Mode: {config.training_mode.upper()}")
     print(f"LoRA Rank: {config.lora_rank}")
     print(f"Batch Size: {config.batch_size}")
     print(f"Learning Rate: {config.learning_rate}")
-    print(f"4-bit Quantization: {config.use_4bit}")
     print(f"Skip Tuning: {args.skip_tuning}")
     
     # Create trainer
     trainer_obj = Llama4ScoutTrainer(config)
     
+    if config.training_mode == "comparison":
+        print("\n🔄 Running Comparison Training")
+        comparison_results = trainer_obj.run_comparison_training(args.max_trials)
+        print("\n🎉 Comparison training completed!")
+        return
+    
+    # Single mode training
     if not args.skip_tuning:
-        print("\n🎯 Phase 1: Hyperparameter Tuning")
+        print(f"\n🎯 Phase 1: Hyperparameter Tuning ({config.training_mode.upper()})")
         tuning_results = trainer_obj.run_hyperparameter_tuning(args.max_trials)
         print(f"🏆 Best configuration: {tuning_results['best_config']}")
         print(f"🏆 Best loss: {tuning_results['best_loss']:.4f}")
