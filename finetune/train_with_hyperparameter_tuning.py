@@ -431,8 +431,18 @@ class AdvancedMemoryTrainer:
         self.model_type = self._determine_model_type(model_name)
         self.target_modules = self._get_target_modules()
         
+        # Set output prefix based on model type
+        self.output_prefix = "scout_" if "scout" in model_name.lower() else ""
+        
         self.hyperparameter_tuner = HyperparameterTuner(self.vram_monitor, self.model_type)
-        self.plotter = TrainingPlotter() if enable_plotting else None
+        
+        # Initialize plotter with custom output directory if using scout model
+        if enable_plotting:
+            plots_dir = f"./finetune/{self.output_prefix}training_plots" if self.output_prefix else "./training_plots"
+            self.plotter = TrainingPlotter(output_dir=plots_dir)
+        else:
+            self.plotter = None
+            
         self.model = None
         self.tokenizer = None
         self.best_config = None
@@ -616,7 +626,8 @@ class AdvancedMemoryTrainer:
             self.load_model_with_config(config)
             
             # Create training arguments
-            output_dir = f"./training_trials/{trial_name}"
+            trials_dir = f"./finetune/{self.output_prefix}training_trials" if self.output_prefix else "./training_trials"
+            output_dir = f"{trials_dir}/{trial_name}"
             training_args = self.create_training_args(config, output_dir)
             
             # Create trainer
@@ -776,7 +787,8 @@ class AdvancedMemoryTrainer:
     def save_tuning_results(self, results: List[Dict], filename: str):
         """Save tuning results to file."""
         try:
-            output_path = Path("./training_trials") / filename
+            trials_dir = f"./finetune/{self.output_prefix}training_trials" if self.output_prefix else "./training_trials"
+            output_path = Path(trials_dir) / filename
             output_path.parent.mkdir(exist_ok=True)
             
             # Create backup if file exists
