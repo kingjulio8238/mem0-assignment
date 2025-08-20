@@ -12,9 +12,16 @@ import argparse
 import os
 from pathlib import Path
 from datetime import datetime
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoProcessor
 from huggingface_hub import hf_hub_download, snapshot_download
 import sys
+
+# Try to import Llama4 model for multimodal support
+try:
+    from transformers import Llama4ForConditionalGeneration
+    LLAMA4_AVAILABLE = True
+except ImportError:
+    LLAMA4_AVAILABLE = False
 
 class UnifiedInferenceBenchmark:
     def __init__(self, model_path, model_type="transformers", quantization=None):
@@ -31,6 +38,8 @@ class UnifiedInferenceBenchmark:
         self.quantization = quantization
         self.model = None
         self.tokenizer = None
+        self.processor = None
+        self.is_llama4 = False
         
         print(f"🚀 Initializing {model_type} model: {model_path}")
         self.load_model()
@@ -52,7 +61,7 @@ class UnifiedInferenceBenchmark:
         
         # Handle HuggingFace cache directory structure for Llama 4 Scout
         model_path = self.model_path
-        if "models--meta-llama--Llama-4-Scout" in model_path and os.path.isdir(model_path):
+        if ("models--meta-llama--Llama-4-Scout" in model_path or "models--unsloth--Llama-4-Scout" in model_path) and os.path.isdir(model_path):
             # Look for the actual model files in snapshots directory
             snapshots_dir = os.path.join(model_path, "snapshots")
             if os.path.exists(snapshots_dir):
@@ -63,13 +72,30 @@ class UnifiedInferenceBenchmark:
                     model_path = os.path.join(snapshots_dir, snapshot_dirs[0])
                     print(f"🔍 Using snapshot: {model_path}")
         
-        # Load tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_path, 
-            trust_remote_code=True
-        )
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+        # Check if this is a Llama4 model by looking at config
+        config_path = os.path.join(model_path, "config.json")
+        if os.path.exists(config_path):
+            import json
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+                if config.get("model_type") == "llama4":
+                    self.is_llama4 = True
+                    print("🦙 Detected Llama4 multimodal model")
+        
+        # Load tokenizer/processor based on model type
+        if self.is_llama4 and LLAMA4_AVAILABLE:
+            print("📥 Loading Llama4 processor...")
+            self.processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
+            # For text-only tasks, we can still use the tokenizer
+            self.tokenizer = self.processor.tokenizer if hasattr(self.processor, 'tokenizer') else None
+        else:
+            print("📥 Loading standard tokenizer...")
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_path, 
+                trust_remote_code=True
+            )
+            if self.tokenizer.pad_token is None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
         
         # Configure model loading parameters
         model_kwargs = {
@@ -104,11 +130,19 @@ class UnifiedInferenceBenchmark:
             # Default to bfloat16 for no quantization
             model_kwargs["torch_dtype"] = torch.bfloat16
         
-        # Load model
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            **model_kwargs
-        )
+        # Load model with appropriate class
+        if self.is_llama4 and LLAMA4_AVAILABLE:
+            print("📥 Loading Llama4ForConditionalGeneration...")
+            self.model = Llama4ForConditionalGeneration.from_pretrained(
+                model_path,
+                **model_kwargs
+            )
+        else:
+            print("📥 Loading AutoModelForCausalLM...")
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                **model_kwargs
+            )
         
         print(f"✅ Model loaded on device: {next(self.model.parameters()).device}")
         
@@ -197,6 +231,67 @@ class UnifiedInferenceBenchmark:
     
     def generate_transformers(self, prompt, max_new_tokens=128):
         """Generate text using transformers models"""
+        if self.is_llama4 and self.processor:
+            return self.generate_llama4(prompt, max_new_tokens)
+        else:
+            return self.generate_standard_transformers(prompt, max_new_tokens)
+    
+    def generate_llama4(self, prompt, max_new_tokens=128):
+        """Generate text using Llama4 multimodal models"""
+        # For text-only generation with Llama4, we create a text-only message
+        messages = [
+            {
+                "role": "user", 
+                "content": [
+                    {"type": "text", "text": prompt}
+                ]
+            }
+        ]
+        
+        start_time = time.time()
+        
+        # Use processor to prepare inputs
+        inputs = self.processor.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            tokenize=True,
+            return_dict=True,
+            return_tensors="pt"
+        ).to(self.model.device)
+        
+        with torch.no_grad():
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                temperature=0.7,
+                do_sample=True
+            )
+        
+        end_time = time.time()
+        latency = end_time - start_time
+        
+        # Calculate tokens generated
+        input_length = inputs['input_ids'].shape[-1]
+        total_length = outputs.shape[-1]
+        tokens_generated = total_length - input_length
+        
+        # Calculate throughput
+        throughput = tokens_generated / latency if latency > 0 else 0
+        
+        # Decode response
+        response = self.processor.batch_decode(outputs[:, input_length:])[0]
+        
+        return {
+            'latency': latency,
+            'tokens_generated': tokens_generated,
+            'throughput': throughput,
+            'response': response.strip(),
+            'input_tokens': input_length,
+            'total_tokens': total_length
+        }
+    
+    def generate_standard_transformers(self, prompt, max_new_tokens=128):
+        """Generate text using standard transformers models"""
         inputs = self.tokenizer(
             prompt, 
             return_tensors="pt", 
@@ -433,6 +528,11 @@ def get_model_configs():
             "type": "transformers",
             "quantization": "bf16"
         },
+        "llama-4-scout-4bit-unsloth": {
+            "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--unsloth--Llama-4-Scout-17B-16E-unsloth-bnb-4bit",
+            "type": "transformers",
+            "quantization": "4bit"
+        },
         "llama-4-scout-gguf-q4km": {
             "path": "/home/ubuntu/mem0-assignment/model_cache/scout_gguf/Q4_K_M",
             "type": "gguf",
@@ -492,8 +592,11 @@ def main():
             print(f"🎯 Using custom model: {model_path}")
         
         # Set output directory based on model
-        if args.model in ["llama-4-scout", "llama-4-scout-bf16"]:
-            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
+        if args.model in ["llama-4-scout", "llama-4-scout-bf16", "llama-4-scout-4bit-unsloth"]:
+            if args.model == "llama-4-scout-4bit-unsloth":
+                output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results_4bit"
+            else:
+                output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
         else:
             output_dir = args.output_dir
         

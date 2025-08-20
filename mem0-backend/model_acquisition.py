@@ -24,6 +24,7 @@ class ModelAcquisition:
         # Model configurations
         # Llama 4 Scout: 16 experts, ~109B total params, 17B active, 10M context length
         self.llama4_scout_id = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+        self.llama4_scout_4bit_id = "mlx-community/meta-llama-Llama-4-Scout-17B-16E-4bit"
         self.instruct_8b_id = "unsloth/llama-3.1-8b-bnb-4bit"
         
         # GPU availability check
@@ -52,36 +53,59 @@ class ModelAcquisition:
             print("💡 Falling back to standard precision (no quantization)")
             return None
     
-    def download_llama4_scout(self, download_only=True):
+    def download_llama4_scout(self, download_only=True, quantization=None):
         """
         Download Llama 4 Scout model
         Args:
             download_only: If True, only download without loading (no GPU needed)
+            quantization: "4bit", "8bit", or None for full precision
         """
         print("🔽 Starting Llama 4 Scout acquisition...")
+        if quantization:
+            print(f"🔧 Quantization mode: {quantization}")
+        
+        # Choose the correct model ID based on quantization
+        if quantization == "4bit":
+            model_id = self.llama4_scout_4bit_id
+            print(f"🎯 Using pre-quantized 4-bit model: {model_id}")
+        else:
+            model_id = self.llama4_scout_id
+            print(f"🎯 Using base model: {model_id}")
         
         try:
             # Download tokenizer (always works, no GPU needed)
             print("📥 Downloading tokenizer...")
             tokenizer = AutoTokenizer.from_pretrained(
-                self.llama4_scout_id,
+                model_id,
                 cache_dir=self.cache_dir,
                 trust_remote_code=True
             )
             print("✅ Tokenizer downloaded successfully")
             
             if download_only:
-                # Just download model files without loading into memory
-                print("📥 Downloading model files...")
+                # Configure download based on quantization and model type
+                download_kwargs = {
+                    "cache_dir": self.cache_dir,
+                    "trust_remote_code": True,
+                    "device_map": None,  # Don't load to device
+                    "low_cpu_mem_usage": True
+                }
+                
+                if quantization == "4bit":
+                    print("📥 Downloading pre-quantized 4-bit model files...")
+                    # For pre-quantized 4-bit model, no additional quantization config needed
+                    download_kwargs["torch_dtype"] = torch.float16  # Pre-quantized models often use fp16
+                else:
+                    print("📥 Downloading model files (bf16)...")
+                    download_kwargs["torch_dtype"] = torch.bfloat16
+                
                 AutoModelForCausalLM.from_pretrained(
-                    self.llama4_scout_id,
-                    cache_dir=self.cache_dir,
-                    trust_remote_code=True,
-                    torch_dtype=torch.bfloat16,
-                    device_map=None,  # Don't load to device
-                    low_cpu_mem_usage=True
+                    model_id,
+                    **download_kwargs
                 )
-                print("✅ Llama 4 Scout model files downloaded")
+                
+                quantization_str = f" ({quantization})" if quantization else ""
+                print(f"✅ Llama 4 Scout{quantization_str} model files downloaded")
                 return {"status": "downloaded", "tokenizer": tokenizer}
             
             else:
@@ -89,21 +113,41 @@ class ModelAcquisition:
                 if not self.gpu_available:
                     raise RuntimeError("GPU required for model loading")
                 
-                # Use official Llama4ForConditionalGeneration for proper CPU offloading
-                print("🔄 Using Llama4ForConditionalGeneration with CPU offloading...")
-                print(f"💾 Available: GPU=85GB, CPU=215GB")
+                # Configure model loading based on quantization
+                model_kwargs = {
+                    "cache_dir": self.cache_dir,
+                    "device_map": "auto",
+                    "trust_remote_code": True,
+                    "low_cpu_mem_usage": True
+                }
                 
-                # According to HuggingFace docs, Llama 4 Scout is designed for single GPU
-                # with on-the-fly quantization and automatic CPU offloading
-                model = Llama4ForConditionalGeneration.from_pretrained(
-                    self.llama4_scout_id,
-                    cache_dir=self.cache_dir,
-                    device_map="auto",  # Official CPU offloading approach
-                    torch_dtype=torch.bfloat16,
-                    trust_remote_code=True,
-                    low_cpu_mem_usage=True
+                if quantization == "4bit":
+                    print("🔄 Loading Llama 4 Scout with 4-bit quantization...")
+                    quantization_config = self.setup_quantization_config(4)
+                    if quantization_config:
+                        model_kwargs["quantization_config"] = quantization_config
+                        model_kwargs["torch_dtype"] = torch.bfloat16
+                    print(f"💾 Expected memory usage: ~8-10GB GPU")
+                elif quantization == "8bit":
+                    print("🔄 Loading Llama 4 Scout with 8-bit quantization...")
+                    quantization_config = self.setup_quantization_config(8)
+                    if quantization_config:
+                        model_kwargs["quantization_config"] = quantization_config
+                        model_kwargs["torch_dtype"] = torch.bfloat16
+                    print(f"💾 Expected memory usage: ~15-20GB GPU")
+                else:
+                    print("🔄 Loading Llama 4 Scout with full precision (bf16)...")
+                    model_kwargs["torch_dtype"] = torch.bfloat16
+                    print(f"💾 Expected memory usage: ~32-34GB GPU")
+                
+                # Use AutoModelForCausalLM for better quantization support
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_id,
+                    **model_kwargs
                 )
-                print("✅ Llama 4 Scout loaded into GPU memory")
+                
+                quantization_str = f" ({quantization})" if quantization else ""
+                print(f"✅ Llama 4 Scout{quantization_str} loaded into GPU memory")
                 return {"status": "loaded", "model": model, "tokenizer": tokenizer}
                 
         except Exception as e:
@@ -170,21 +214,23 @@ class ModelAcquisition:
             print(f"❌ Error with 8B Instruct: {e}")
             return {"status": "error", "error": str(e)}
     
-    def download_selected_models(self, models=["both"], download_only=True):
+    def download_selected_models(self, models=["both"], download_only=True, quantization=None):
         """Download selected models based on user choice"""
         print("🚀 Starting model acquisition process...")
         print(f"Mode: {'Download only' if download_only else 'Download and load'}")
         print(f"Models to download: {', '.join(models)}")
+        if quantization:
+            print(f"Quantization: {quantization}")
         
         results = {}
         
         # Determine which models to download
-        download_llama4 = "both" in models or "llama4" in models
+        download_llama4 = "both" in models or "llama4" in models or "llama4-4bit" in models
         download_8b = "both" in models or "8b" in models or "instruct" in models
         
         if download_llama4:
             print("\n📥 Downloading Llama 4 Scout...")
-            results["llama4_scout"] = self.download_llama4_scout(download_only)
+            results["llama4_scout"] = self.download_llama4_scout(download_only, quantization)
         else:
             print("\n⏭️  Skipping Llama 4 Scout")
             
@@ -248,17 +294,19 @@ def main():
 Examples:
   python model_acquisition.py                          # Download both models (default)
   python model_acquisition.py --models 8b              # Download only 8B instruct model
-  python model_acquisition.py --models llama4          # Download only Llama 4 Scout
+  python model_acquisition.py --models llama4          # Download only Llama 4 Scout (bf16)
+  python model_acquisition.py --models llama4 --quantization 4bit  # Download Llama 4 Scout for 4-bit
+  python model_acquisition.py --models llama4-4bit     # Shorthand for 4-bit Llama 4 Scout
   python model_acquisition.py --models 8b llama4       # Download both models explicitly
   python model_acquisition.py --load                   # Download and load models into memory
-  python model_acquisition.py --models 8b --load       # Download and load only 8B model
+  python model_acquisition.py --models llama4 --load --quantization 4bit  # Load 4-bit Scout
         """
     )
     
     parser.add_argument(
         "--models", 
         nargs="+", 
-        choices=["both", "8b", "instruct", "llama4"],
+        choices=["both", "8b", "instruct", "llama4", "llama4-4bit"],
         default=["both"],
         help="Choose which models to download (default: both)"
     )
@@ -275,11 +323,22 @@ Examples:
         help="Directory to cache downloaded models (default: ./model_cache)"
     )
     
+    parser.add_argument(
+        "--quantization",
+        choices=["4bit", "8bit"],
+        help="Quantization method for Llama 4 Scout (4bit, 8bit, or none for bf16)"
+    )
+    
     args = parser.parse_args()
     
     print("🎯 Phase 2A: Model Acquisition")
     print(f"📋 Selected models: {', '.join(args.models)}")
     print(f"💾 Load into memory: {'Yes' if args.load else 'No (download only)'}")
+    
+    # Handle special case for llama4-4bit shorthand
+    if "llama4-4bit" in args.models and not args.quantization:
+        args.quantization = "4bit"
+        print("🔧 Auto-detected 4-bit quantization from model selection")
     
     # Initialize acquisition system
     acquisition = ModelAcquisition(cache_dir=args.cache_dir)
@@ -292,7 +351,8 @@ Examples:
     # Download selected models
     results = acquisition.download_selected_models(
         models=args.models, 
-        download_only=not args.load
+        download_only=not args.load,
+        quantization=args.quantization
     )
     
     # Show final info

@@ -7,7 +7,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 # Available models
 MODELS = {
     "llama3.1": "unsloth/llama-3.1-8b-bnb-4bit",
-    "llama4": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct/snapshots/92f3b1597a195b523d8d9e5700e57e4fbb8f20d3",
+    "llama4": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
+    "llama4-bf16": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
+    "llama4-4bit": "mlx-community/meta-llama-Llama-4-Scout-17B-16E-4bit",
     "llama4-gguf": "/home/ubuntu/mem0-assignment/model_cache/scout_gguf/Q4_K_M"
 }
 
@@ -15,17 +17,27 @@ def load_model(model_choice):
     """Load the specified model and tokenizer"""
     model_path = MODELS[model_choice]
     
+    # Determine model name and quantization settings
     if model_choice == "llama3.1":
-        model_name = "Llama 3.1 8B"
+        model_name = "Llama 3.1 8B (4-bit)"
+        quantization = "4bit"
     elif model_choice == "llama4":
-        model_name = "Llama 4 Scout 17B"
+        model_name = "Llama 4 Scout 17B (default)"
+        quantization = None
+    elif model_choice == "llama4-bf16":
+        model_name = "Llama 4 Scout 17B (bf16)"
+        quantization = "bf16"
+    elif model_choice == "llama4-4bit":
+        model_name = "Llama 4 Scout 17B (4-bit)"
+        quantization = "4bit"
     else:  # llama4-gguf
         model_name = "Llama 4 Scout 17B GGUF Q4_K_M"
+        quantization = "gguf"
     
     print(f"Loading {model_name} model from: {model_path}")
     
     # Handle GGUF model differently
-    if model_choice == "llama4-gguf":
+    if quantization == "gguf":
         try:
             from llama_cpp import Llama
             from pathlib import Path
@@ -54,21 +66,48 @@ def load_model(model_choice):
             subprocess.run(["pip", "install", "llama-cpp-python"], check=True)
             return load_model(model_choice)  # Retry after installation
     else:
-        # Original transformers model loading
+        # Handle HuggingFace cache directory structure for Llama 4 Scout
+        if "models--meta-llama--Llama-4-Scout" in model_path and os.path.isdir(model_path):
+            # Look for the actual model files in snapshots directory
+            snapshots_dir = os.path.join(model_path, "snapshots")
+            if os.path.exists(snapshots_dir):
+                # Find the latest snapshot
+                snapshot_dirs = [d for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
+                if snapshot_dirs:
+                    # Use the first (and likely only) snapshot
+                    model_path = os.path.join(snapshots_dir, snapshot_dirs[0])
+                    print(f"🔍 Using snapshot: {model_path}")
+        
+        # Transformers model loading
         tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
 
-        # Load model with appropriate settings
+        # Configure model loading based on quantization
         load_kwargs = {
             "device_map": "auto",
-            "torch_dtype": torch.bfloat16,
             "trust_remote_code": True,
+            "low_cpu_mem_usage": True
         }
         
-        # Use 4-bit quantization for Llama 3.1, regular loading for Llama 4
-        if model_choice == "llama3.1":
-            load_kwargs["load_in_4bit"] = True
+        # Set quantization and torch dtype
+        if quantization == "4bit":
+            print("🔧 Using 4-bit quantization...")
+            from transformers import BitsAndBytesConfig
+            load_kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                llm_int8_enable_fp32_cpu_offload=True
+            )
+            load_kwargs["torch_dtype"] = torch.bfloat16
+        elif quantization == "bf16":
+            print("🔧 Using bf16 precision...")
+            load_kwargs["torch_dtype"] = torch.bfloat16
+        else:
+            # Default to bfloat16 for no quantization
+            load_kwargs["torch_dtype"] = torch.bfloat16
         
         model = AutoModelForCausalLM.from_pretrained(model_path, **load_kwargs)
         print(f"Model loaded on device: {next(model.parameters()).device}")
@@ -77,7 +116,7 @@ def load_model(model_choice):
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Test Mem0 with different Llama models")
-parser.add_argument("--model", choices=["llama3.1", "llama4", "llama4-gguf"], default="llama3.1",
+parser.add_argument("--model", choices=["llama3.1", "llama4", "llama4-bf16", "llama4-4bit", "llama4-gguf"], default="llama3.1",
                    help="Choose which model to use (default: llama3.1)")
 args = parser.parse_args()
 
@@ -156,9 +195,13 @@ def chat_with_memory(user_input, user_id="alice"):
 
 if __name__ == "__main__":
     if args.model == "llama3.1":
-        model_name = "Llama 3.1 8B"
+        model_name = "Llama 3.1 8B (4-bit)"
     elif args.model == "llama4":
-        model_name = "Llama 4 Scout 17B"
+        model_name = "Llama 4 Scout 17B (default)"
+    elif args.model == "llama4-bf16":
+        model_name = "Llama 4 Scout 17B (bf16)"
+    elif args.model == "llama4-4bit":
+        model_name = "Llama 4 Scout 17B (4-bit)"
     else:  # llama4-gguf
         model_name = "Llama 4 Scout 17B GGUF Q4_K_M"
     print("="*50)
@@ -199,3 +242,17 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print("Testing completed!")
     print("="*50)
+
+def get_model_choice_for_benchmark(benchmark_model_name):
+    """
+    Map benchmark model names to main.py model choices
+    This function helps the unified_memory_benchmark.py script
+    """
+    mapping = {
+        "llama3.1": "llama3.1",
+        "llama4": "llama4",
+        "llama4-bf16": "llama4-bf16", 
+        "llama4-4bit": "llama4-4bit",
+        "llama4-gguf": "llama4-gguf"
+    }
+    return mapping.get(benchmark_model_name, "llama3.1")  # Default fallback

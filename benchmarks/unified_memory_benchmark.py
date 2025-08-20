@@ -30,12 +30,20 @@ class UnifiedMemoryBenchmark:
         self.model_type = model_type
         self.user_id = f"benchmark_user_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
-        # Import memory functions
+        # Import memory functions and set up model if specified
         try:
-            from main import add_memory, search_memory, memory
+            from main import add_memory, search_memory, memory, get_model_choice_for_benchmark
             self.add_memory = add_memory
             self.search_memory = search_memory
             self.memory = memory
+            
+            # If a model is specified, we need to ensure the correct model is loaded
+            if model_path:
+                # Get the benchmark model name from the path
+                benchmark_model_name = model_path.split('/')[-1] if '/' in str(model_path) else str(model_path)
+                # This is mainly for reference - the actual model loading happens in main.py
+                print(f"🎯 Benchmark will reference model: {benchmark_model_name}")
+            
             print("✅ Memory functions loaded successfully")
         except ImportError as e:
             print(f"❌ Failed to import memory functions: {e}")
@@ -359,34 +367,24 @@ class UnifiedMemoryBenchmark:
 def get_model_configs():
     """Get predefined model configurations"""
     return {
-        "llama-3.1-8b-bnb-4bit": {
+        "llama3.1": {
             "path": "unsloth/llama-3.1-8b-bnb-4bit",
             "type": "transformers",
             "quantization": "4bit"
         },
-        "llama-3.1-bf16-gguf": {
-            "path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.BF16.gguf",
-            "type": "gguf",
-            "quantization": "bf16"
-        },
-        "llama-3.1-q4km-gguf": {
-            "path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.Q4_K_M.gguf",
-            "type": "gguf", 
-            "quantization": "4bit"
-        },
-        "llama-4-scout": {
+        "llama4": {
             "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
             "type": "transformers",
             "quantization": None
         },
-        "llama-4-scout-bf16": {
+        "llama4-bf16": {
             "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
             "type": "transformers",
             "quantization": "bf16"
         },
-        "llama-4-scout-gguf-q4km": {
-            "path": "/home/ubuntu/mem0-assignment/model_cache/scout_gguf/Q4_K_M",
-            "type": "gguf",
+        "llama4-4bit": {
+            "path": "mlx-community/meta-llama-Llama-4-Scout-17B-16E-4bit",
+            "type": "transformers",
             "quantization": "4bit"
         },
         "llama4-gguf": {
@@ -446,7 +444,7 @@ def main():
                 print("🎯 Using default memory benchmark (no specific model)")
         
         # Set output directory based on model
-        if args.model in ["llama-4-scout", "llama-4-scout-bf16", "llama-4-scout-gguf-q4km", "llama4-gguf"]:
+        if args.model in ["llama4", "llama4-bf16", "llama4-4bit", "llama4-gguf"]:
             output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
         else:
             output_dir = args.output_dir
