@@ -477,7 +477,7 @@ class AdvancedMemoryTrainer:
             
         model_paths = {
             "llama3.1-8b": "unsloth/llama-3.1-8b-bnb-4bit",
-            "llama4-scout": "unsloth/Llama-4-Scout-17B-16E-Instruct-unsloth-bnb-4bit"
+            "llama4-scout": "unsloth/Llama-4-Scout-17B-16E-Instruct-unsloth"
         }
         
         return model_paths.get(model_name, model_name)
