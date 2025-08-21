@@ -177,7 +177,7 @@ class TrainingPlotter:
     
     def __init__(self, output_dir: str = "./training_plots"):
         self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Set plotting style
         plt.style.use('default')
@@ -789,7 +789,7 @@ class AdvancedMemoryTrainer:
         try:
             trials_dir = f"./finetune/{self.output_prefix}training_trials" if self.output_prefix else "./training_trials"
             output_path = Path(trials_dir) / filename
-            output_path.parent.mkdir(exist_ok=True)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             
             # Create backup if file exists
             if output_path.exists():
