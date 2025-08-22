@@ -206,7 +206,7 @@ class HyperparameterTuner:
 class TrainingPlotter:
     """Generate comprehensive plots for training metrics and analysis."""
     
-    def __init__(self, output_dir: str = "./training_plots"):
+    def __init__(self, output_dir: str = "./training_details/training_plots"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -476,7 +476,7 @@ class AdvancedMemoryTrainer:
         
         # Initialize plotter with custom output directory if using scout model
         if enable_plotting:
-            plots_dir = f"./finetune/{self.output_prefix}training_plots" if self.output_prefix else "./training_plots"
+            plots_dir = f"./finetune/{self.output_prefix}training_details/training_plots" if self.output_prefix else "./training_details/training_plots"
             self.plotter = TrainingPlotter(output_dir=plots_dir)
         else:
             self.plotter = None
@@ -674,7 +674,7 @@ class AdvancedMemoryTrainer:
             self.load_model_with_config(config)
             
             # Create training arguments
-            trials_dir = f"./finetune/{self.output_prefix}training_trials" if self.output_prefix else "./training_trials"
+            trials_dir = f"./finetune/{self.output_prefix}training_details/training_trials" if self.output_prefix else "./training_details/training_trials"
             output_dir = f"{trials_dir}/{trial_name}"
             training_args = self.create_training_args(config, output_dir)
             
@@ -842,7 +842,7 @@ class AdvancedMemoryTrainer:
     def save_tuning_results(self, results: List[Dict], filename: str):
         """Save tuning results to file."""
         try:
-            trials_dir = f"./finetune/{self.output_prefix}training_trials" if self.output_prefix else "./training_trials"
+            trials_dir = f"./finetune/{self.output_prefix}training_details/training_trials" if self.output_prefix else "./training_details/training_trials"
             output_path = Path(trials_dir) / filename
             output_path.parent.mkdir(parents=True, exist_ok=True)
             

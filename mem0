@@ -1,0 +1,368 @@
+#!/usr/bin/env python3
+"""
+Mem0 CLI - Complete memory-focused LLM pipeline interface
+"""
+
+import argparse
+import sys
+import os
+import subprocess
+import readline
+import shlex
+from pathlib import Path
+
+# Get the project root directory
+# Handle both direct execution and system-wide installation
+if os.environ.get('MEM0_PROJECT_ROOT'):
+    # Use environment variable if set
+    PROJECT_ROOT = Path(os.environ['MEM0_PROJECT_ROOT'])
+elif __file__.startswith('/usr/local/bin/'):
+    # If installed system-wide, look for the project in common locations
+    possible_paths = [
+        Path.home() / "Desktop" / "code" / "mem0-assignment",
+        Path.home() / "mem0-assignment",
+        Path.cwd() / "mem0-assignment",
+        Path.cwd(),
+    ]
+    
+    PROJECT_ROOT = None
+    for path in possible_paths:
+        if path.exists() and (path / "mem0-backend").exists():
+            PROJECT_ROOT = path
+            break
+    
+    if PROJECT_ROOT is None:
+        print("❌ Error: Could not find mem0-assignment project directory")
+        print("Please run this command from the project directory or set MEM0_PROJECT_ROOT environment variable")
+        sys.exit(1)
+else:
+    # Direct execution from project directory
+    PROJECT_ROOT = Path(__file__).parent.absolute()
+
+def run_command(cmd, cwd=None):
+    """Run a command and return the result"""
+    try:
+        result = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True)
+        return result.returncode, result.stdout, result.stderr
+    except Exception as e:
+        return 1, "", str(e)
+
+def show_usage():
+    """Show the main usage information"""
+    print("""
+Mem0 CLI - Complete memory-focused LLM pipeline
+
+Usage:
+  mem0 [component] [command] [options]  # Direct command execution
+  mem0                                  # Enter interactive mode
+
+Components:
+  memory     - Memory storage and retrieval system
+  train      - Fine-tune memory models
+  benchmark  - Test model performance
+  help       - Show this help
+
+Examples:
+  # Direct execution
+  mem0 memory add "I love basketball" --user alice
+  mem0 train --max-trials 3 --num-epochs 2 --export-formats gguf
+  mem0 benchmark inference --model llama3.1 --num-prompts 100
+
+  # Interactive mode
+  mem0
+  > memory add "I love basketball" --user alice
+  > benchmark memory --model llama3.1-instruct-bf16
+  > exit
+
+For detailed help on any component:
+  mem0 [component] --help
+""")
+
+def show_interactive_help():
+    """Show help for interactive mode"""
+    print("""
+Interactive Commands:
+  memory <command> [options]     - Memory operations
+  train [options]                - Fine-tune models
+  benchmark <command> [options]  - Benchmark operations
+  help                           - Show this help
+  exit, quit, ctrl+c             - Exit CLI
+
+Examples:
+  > memory add "I love basketball" --user alice
+  > memory search "sports" --user alice
+  > benchmark inference --model llama3.1 --num-prompts 100
+  > train --max-trials 3 --num-epochs 2
+""")
+
+def interactive_mode():
+    """Run interactive CLI mode"""
+    print("""
+🤖 Welcome to Mem0 CLI!
+Type 'help' for available commands, 'exit' to quit.
+""")
+    
+    while True:
+        try:
+            # Get user input
+            command = input("mem0> ").strip()
+            
+            if not command:
+                continue
+            
+            # Handle exit commands
+            if command.lower() in ['exit', 'quit', 'q']:
+                print("👋 Goodbye!")
+                break
+            
+            # Handle help
+            if command.lower() == 'help':
+                show_interactive_help()
+                continue
+            
+            # Parse the command using shlex to handle quotes properly
+            try:
+                parts = shlex.split(command)
+            except ValueError as e:
+                print(f"Error parsing command: {e}")
+                continue
+            
+            if not parts:
+                continue
+            
+            component = parts[0]
+            remaining = parts[1:]
+            
+            # Execute the command
+            if component == "memory":
+                if not remaining:
+                    print("Memory commands:")
+                    print("  add <message>     - Add a memory")
+                    print("  search <query>    - Search memories")
+                    print("  chat <message>    - Chat with memory integration")
+                    print("  list-users        - List all users")
+                    continue
+                
+                subcommand = remaining[0]
+                args = remaining[1:]
+                
+                # Build the command for the memory backend
+                cmd = [sys.executable, f"{PROJECT_ROOT}/mem0-backend/cli.py", subcommand]
+                cmd.extend(args)
+                
+                # Run the command
+                try:
+                    result = subprocess.run(cmd, cwd=PROJECT_ROOT, capture_output=True, text=True)
+                    if result.stdout:
+                        print(result.stdout)
+                    if result.stderr:
+                        print(result.stderr, file=sys.stderr)
+                except Exception as e:
+                    print(f"Error running command: {e}", file=sys.stderr)
+            
+            elif component == "train":
+                # Build the command for training
+                cmd = [sys.executable, f"{PROJECT_ROOT}/finetune/train.py"]
+                cmd.extend(remaining)
+                
+                # Run the command
+                try:
+                    result = subprocess.run(cmd, cwd=PROJECT_ROOT, capture_output=True, text=True)
+                    if result.stdout:
+                        print(result.stdout)
+                    if result.stderr:
+                        print(result.stderr, file=sys.stderr)
+                except Exception as e:
+                    print(f"Error running command: {e}", file=sys.stderr)
+            
+            elif component == "benchmark":
+                if not remaining:
+                    print("Benchmark commands:")
+                    print("  inference <options>  - Test inference performance")
+                    print("  memory <options>     - Test memory retrieval")
+                    print("  compare <options>    - Compare model results")
+                    continue
+                
+                subcommand = remaining[0]
+                args = remaining[1:]
+                
+                if subcommand == "inference":
+                    cmd = [sys.executable, f"{PROJECT_ROOT}/benchmarks/scripts/unified_inference_benchmark.py"]
+                elif subcommand == "memory":
+                    cmd = [sys.executable, f"{PROJECT_ROOT}/benchmarks/scripts/unified_memory_benchmark.py"]
+                elif subcommand == "compare":
+                    cmd = [sys.executable, f"{PROJECT_ROOT}/benchmarks/benchmark_comparison_analysis.py"]
+                else:
+                    print(f"Unknown benchmark subcommand: {subcommand}")
+                    continue
+                
+                cmd.extend(args)
+                
+                # Run the command
+                try:
+                    result = subprocess.run(cmd, cwd=PROJECT_ROOT, capture_output=True, text=True)
+                    if result.stdout:
+                        print(result.stdout)
+                    if result.stderr:
+                        print(result.stderr, file=sys.stderr)
+                except Exception as e:
+                    print(f"Error running command: {e}", file=sys.stderr)
+            
+            else:
+                print(f"Unknown component: {component}")
+                print("Type 'help' for available commands")
+        
+        except KeyboardInterrupt:
+            print("\n👋 Goodbye!")
+            break
+        except EOFError:
+            print("\n👋 Goodbye!")
+            break
+
+def memory_command(args):
+    """Handle memory-related commands"""
+    if not args.subcommand:
+        print("Memory commands:")
+        print("  add <message>     - Add a memory")
+        print("  search <query>    - Search memories")
+        print("  chat <message>    - Chat with memory integration")
+        print("  list-users        - List all users")
+        return
+    
+    # Build the command for the memory backend
+    cmd = [sys.executable, f"{PROJECT_ROOT}/mem0-backend/cli.py", args.subcommand]
+    
+    # Add remaining arguments
+    if args.remaining:
+        cmd.extend(args.remaining)
+    
+    # Run the command using subprocess with list arguments to preserve quoting
+    try:
+        result = subprocess.run(cmd, cwd=PROJECT_ROOT, capture_output=True, text=True)
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+        return result.returncode
+    except Exception as e:
+        print(f"Error running command: {e}", file=sys.stderr)
+        return 1
+
+def train_command(args):
+    """Handle training commands"""
+    # Build the command for training
+    cmd = [sys.executable, f"{PROJECT_ROOT}/finetune/train.py"]
+    
+    # Add all arguments
+    if args.remaining:
+        cmd.extend(args.remaining)
+    
+    # Run the command using subprocess with list arguments
+    try:
+        result = subprocess.run(cmd, cwd=PROJECT_ROOT, capture_output=True, text=True)
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+        return result.returncode
+    except Exception as e:
+        print(f"Error running command: {e}", file=sys.stderr)
+        return 1
+
+def benchmark_command(args):
+    """Handle benchmark commands"""
+    if not args.subcommand:
+        print("Benchmark commands:")
+        print("  inference <options>  - Test inference performance")
+        print("  memory <options>     - Test memory retrieval")
+        print("  compare <options>    - Compare model results")
+        return
+    
+    if args.subcommand == "inference":
+        cmd = [sys.executable, f"{PROJECT_ROOT}/benchmarks/scripts/unified_inference_benchmark.py"]
+    elif args.subcommand == "memory":
+        cmd = [sys.executable, f"{PROJECT_ROOT}/benchmarks/scripts/unified_memory_benchmark.py"]
+    elif args.subcommand == "compare":
+        cmd = [sys.executable, f"{PROJECT_ROOT}/benchmarks/benchmark_comparison_analysis.py"]
+    else:
+        print(f"Unknown benchmark subcommand: {args.subcommand}")
+        return 1
+    
+    # Add remaining arguments
+    if args.remaining:
+        cmd.extend(args.remaining)
+    
+    # Run the command using subprocess with list arguments
+    try:
+        result = subprocess.run(cmd, cwd=PROJECT_ROOT, capture_output=True, text=True)
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+        return result.returncode
+    except Exception as e:
+        print(f"Error running command: {e}", file=sys.stderr)
+        return 1
+
+def main():
+    # If no arguments provided, enter interactive mode
+    if len(sys.argv) == 1:
+        interactive_mode()
+        return 0
+    
+    parser = argparse.ArgumentParser(
+        description="Mem0 CLI - Complete memory-focused LLM pipeline",
+        add_help=False
+    )
+    
+    # Parse the main component
+    component = sys.argv[1]
+    
+    if component in ["help", "--help", "-h"]:
+        show_usage()
+        return 0
+    
+    # Create a namespace for arguments
+    class Args:
+        pass
+    
+    args = Args()
+    
+    if component == "memory":
+        # Parse memory subcommand
+        if len(sys.argv) < 3:
+            print("Memory commands:")
+            print("  add <message>     - Add a memory")
+            print("  search <query>    - Search memories")
+            print("  chat <message>    - Chat with memory integration")
+            print("  list-users        - List all users")
+            return 0
+        
+        args.subcommand = sys.argv[2]
+        args.remaining = sys.argv[3:]
+        return memory_command(args)
+    
+    elif component == "train":
+        args.remaining = sys.argv[2:]
+        return train_command(args)
+    
+    elif component == "benchmark":
+        # Parse benchmark subcommand
+        if len(sys.argv) < 3:
+            print("Benchmark commands:")
+            print("  inference <options>  - Test inference performance")
+            print("  memory <options>     - Test memory retrieval")
+            print("  compare <options>    - Compare model results")
+            return 0
+        
+        args.subcommand = sys.argv[2]
+        args.remaining = sys.argv[3:]
+        return benchmark_command(args)
+    
+    else:
+        print(f"Unknown component: {component}")
+        show_usage()
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())

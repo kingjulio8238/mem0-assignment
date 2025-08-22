@@ -1,45 +1,50 @@
-# Fine-tuning Pipeline
+# Fine-tuning
 
-This directory contains the fine-tuning pipeline implementation using Unsloth with QLoRA adapters.
+**TLDR**: Train memory-focused LLMs with automated hyperparameter tuning. Export to GGUF/vLLM formats for deployment.
 
-## Setup
+## Quick Start
 
-The pipeline is configured with:
-- **Quantization**: `load_in_4bit=True` for memory efficiency
-- **Training Method**: QLoRA adapters (recommended by Unsloth for beginners)
-- **Model**: `unsloth/llama-3.1-8b-bnb-4bit` (Unsloth dynamic 4-bit quantized)
+```bash
+# Train with hyperparameter tuning + export to GGUF
+python train.py --max-trials 3 --num-epochs 2 --export-formats gguf
+
+# Train with both export formats
+python train.py --export-formats gguf vllm --hf-repo-name "your-username/model-name"
+
+# Skip tuning, use default config
+python train.py --skip-tuning --export-formats gguf --num-epochs 3
+
+# Create custom dataset
+python create_memory_dataset.py
+
+# Upload to Hugging Face
+python upload_to_hf.py --model-path ./trained_model --repo-name "your-username/model-name"
+```
+
+## What This Does
+
+- **Hyperparameter Tuning**: Automatically tests LoRA ranks, batch sizes, learning rates
+- **Memory Training**: Fine-tunes models on 5,000 memory-focused examples
+- **Model Export**: Saves in GGUF (local inference) or vLLM (serving) formats
+- **VRAM Monitoring**: Real-time GPU memory tracking and optimization
 
 ## Files
 
-- `train_with_hyperparamter_training.py`: Main fine-tuning pipeline implementation
-- `README.md`: This documentation file
-
-## Usage
-
-```python
-from finetune_pipeline import FineTunePipeline
-
-# Initialize pipeline
-pipeline = FineTunePipeline()
-
-# Load model with QLoRA configuration
-model, tokenizer = pipeline.load_model()
-
-# Setup training (dataset preparation needed)
-# training_args = pipeline.setup_training_args()
-# trainer = pipeline.create_trainer(dataset, training_args)
-# trainer.train()
-```
-
-## Next Steps
-
-1. Dataset preparation - convert data to proper format for training
-2. Training configuration and execution
-3. Model evaluation and saving
+- `train.py` - Complete training pipeline with hyperparameter tuning
+- `memory_dataset.jsonl` - 5,000 training examples in ChatML format
+- `create_memory_dataset.py` - Generate custom training data
+- `export_to_gguf.py` - Convert models to GGUF format
+- `upload_to_hf.py` - Upload models to Hugging Face
 
 ## Requirements
 
-Make sure to install dependencies from the main requirements.txt:
-```bash
-pip install -r ../requirements.txt
-```
+**Minimum**: 6GB VRAM, 16GB RAM  
+**Recommended**: 8GB+ VRAM, 32GB RAM
+
+## Output
+
+- Trained model in HuggingFace format
+- GGUF model for llama.cpp/Ollama
+- vLLM model for high-throughput serving
+- Training plots and hyperparameter analysis
+- Memory usage reports

@@ -371,7 +371,7 @@ class UnifiedInferenceBenchmark:
     
     def load_test_prompts(self):
         """Load test prompts from file"""
-        prompts_file = Path(__file__).parent / "test_prompts.txt"
+        prompts_file = Path(__file__).parent.parent / "test_prompts.txt"
         if not prompts_file.exists():
             # Create default prompts if file doesn't exist
             default_prompts = [
@@ -503,44 +503,29 @@ class UnifiedInferenceBenchmark:
 def get_model_configs():
     """Get predefined model configurations"""
     return {
-        "llama-3.1-8b-bnb-4bit": {
+        "llama3.1": {
             "path": "unsloth/llama-3.1-8b-bnb-4bit",
             "type": "transformers",
             "quantization": "4bit"
         },
-        "llama-3.1-8b-instruct-bf16": {
+        "llama3.1-instruct-bf16": {
             "path": "meta-llama/Llama-3.1-8B-Instruct",
             "type": "transformers",
             "quantization": "bf16"
         },
-        "llama-3.1-bf16-gguf": {
-            "path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.BF16.gguf",
-            "type": "gguf",
-            "quantization": "bf16"
-        },
-        "llama-3.1-q4km-gguf": {
-            "path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.Q4_K_M.gguf",
-            "type": "gguf", 
+        "llama3.1-finetuned": {
+            "path": "kingJulio/llama-3.1-8b-memory-finetune",
+            "type": "transformers",
             "quantization": "4bit"
         },
-        "llama-4-scout": {
-            "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
-            "type": "transformers",
-            "quantization": None
-        },
-        "llama-4-scout-bf16": {
+        "llama4-bf16": {
             "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
             "type": "transformers",
             "quantization": "bf16"
         },
-        "llama-4-scout-4bit-unsloth": {
-            "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--unsloth--Llama-4-Scout-17B-16E-unsloth-bnb-4bit",
+        "llama4-4bit": {
+            "path": "unsloth/Llama-4-Scout-17B-16E-Instruct-unsloth-bnb-4bit",
             "type": "transformers",
-            "quantization": "4bit"
-        },
-        "llama-4-scout-gguf-q4km": {
-            "path": "/home/ubuntu/mem0-assignment/model_cache/scout_gguf/Q4_K_M",
-            "type": "gguf",
             "quantization": "4bit"
         }
     }
@@ -597,13 +582,12 @@ def main():
             print(f"🎯 Using custom model: {model_path}")
         
         # Set output directory based on model
-        if args.model in ["llama-4-scout", "llama-4-scout-bf16", "llama-4-scout-4bit-unsloth"]:
-            if args.model == "llama-4-scout-4bit-unsloth":
-                output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results_4bit"
-            else:
-                output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
-        elif args.model == "llama-3.1-8b-instruct-bf16":
-            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/base_model_results_bf16"
+        if args.model in ["llama4-bf16", "llama4-4bit"]:
+            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
+        elif args.model == "llama3.1-instruct-bf16":
+            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/results/base_model_results_bf16"
+        elif args.model == "llama3.1-finetuned":
+            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/results/finetuned_results"
         else:
             output_dir = args.output_dir
         

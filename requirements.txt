@@ -23,4 +23,5 @@ GPUtil
 tensorboard
 scipy
 einops
+llama-cpp-python>=0.2.0
 

@@ -32,7 +32,7 @@ class UnifiedMemoryBenchmark:
         
         # Import memory functions and set up model if specified
         try:
-            from main import add_memory, search_memory, memory, get_model_choice_for_benchmark
+            from wrap import add_memory, search_memory, memory, get_model_choice_for_benchmark
             self.add_memory = add_memory
             self.search_memory = search_memory
             self.memory = memory
@@ -41,7 +41,7 @@ class UnifiedMemoryBenchmark:
             if model_path:
                 # Get the benchmark model name from the path
                 benchmark_model_name = model_path.split('/')[-1] if '/' in str(model_path) else str(model_path)
-                # This is mainly for reference - the actual model loading happens in main.py
+                # This is mainly for reference - the actual model loading happens in wrap.py
                 print(f"🎯 Benchmark will reference model: {benchmark_model_name}")
             
             print("✅ Memory functions loaded successfully")
@@ -51,7 +51,7 @@ class UnifiedMemoryBenchmark:
     
     def load_synthetic_memories(self):
         """Load synthetic memories from text file"""
-        memories_file = Path(__file__).parent / "synthetic_memories.txt"
+        memories_file = Path(__file__).parent.parent / "synthetic_memories.txt"
         
         if not memories_file.exists():
             # Create default synthetic memories if file doesn't exist
@@ -184,7 +184,7 @@ class UnifiedMemoryBenchmark:
     def calculate_precision_at_k(self, retrieved_memories, relevant_keywords, k=5):
         """Calculate precision@k for retrieved memories"""
         if not retrieved_memories:
-            return 0.0
+            return 0.0, []
             
         # Take top k results
         top_k = retrieved_memories[:k]
@@ -208,6 +208,34 @@ class UnifiedMemoryBenchmark:
         precision = relevant_count / min(len(top_k), k)
         return precision, list(set(matched_keywords))
     
+    def calculate_recall_at_k(self, retrieved_memories, relevant_keywords, k=5):
+        """Calculate recall@k for retrieved memories"""
+        if not retrieved_memories or not relevant_keywords:
+            return 0.0, []
+            
+        # Take top k results
+        top_k = retrieved_memories[:k]
+        
+        # Find all unique relevant keywords that appear in the retrieved memories
+        found_keywords = set()
+        
+        for mem in top_k:
+            memory_text = mem.get('memory', '').lower()
+            
+            for keyword in relevant_keywords:
+                if keyword.lower() in memory_text:
+                    found_keywords.add(keyword)
+        
+        # Calculate recall: found keywords / total relevant keywords
+        recall = len(found_keywords) / len(relevant_keywords)
+        return recall, list(found_keywords)
+    
+    def calculate_f1_score(self, precision, recall):
+        """Calculate F1 score from precision and recall"""
+        if precision + recall == 0:
+            return 0.0
+        return 2 * (precision * recall) / (precision + recall)
+    
     def run_retrieval_benchmark(self, queries):
         """Run retrieval benchmark on query set"""
         print(f"🎯 Running retrieval benchmark with {len(queries)} queries...")
@@ -219,6 +247,7 @@ class UnifiedMemoryBenchmark:
                 'model_type': self.model_type,
                 'num_queries': len(queries),
                 'precision_k': 5,
+                'recall_k': 5,
                 'timestamp': datetime.now().isoformat()
             },
             'individual_results': [],
@@ -226,8 +255,12 @@ class UnifiedMemoryBenchmark:
         }
         
         total_precision = 0
+        total_recall = 0
+        total_f1 = 0
         total_retrieval_time = 0
         precision_scores = []
+        recall_scores = []
+        f1_scores = []
         retrieval_times = []
         
         for i, query_data in enumerate(queries, 1):
@@ -249,10 +282,14 @@ class UnifiedMemoryBenchmark:
                 else:
                     retrieved_memories = search_result or []
                 
-                # Calculate precision@5
+                # Calculate precision@5 and recall@5
                 precision, matched_keywords = self.calculate_precision_at_k(
                     retrieved_memories, relevant_keywords, k=5
                 )
+                recall, found_keywords = self.calculate_recall_at_k(
+                    retrieved_memories, relevant_keywords, k=5
+                )
+                f1_score = self.calculate_f1_score(precision, recall)
                 
                 # Store individual result
                 individual_result = {
@@ -260,8 +297,11 @@ class UnifiedMemoryBenchmark:
                     'query': query,
                     'relevant_keywords': relevant_keywords,
                     'matched_keywords': matched_keywords,
+                    'found_keywords': found_keywords,
                     'num_retrieved': len(retrieved_memories),
                     'precision_at_5': precision,
+                    'recall_at_5': recall,
+                    'f1_score': f1_score,
                     'retrieval_time': retrieval_time,
                     'top_5_memories': [mem.get('memory', '') for mem in retrieved_memories[:5]],
                     'success': True
@@ -269,11 +309,15 @@ class UnifiedMemoryBenchmark:
                 
                 # Accumulate metrics
                 total_precision += precision
+                total_recall += recall
+                total_f1 += f1_score
                 total_retrieval_time += retrieval_time
                 precision_scores.append(precision)
+                recall_scores.append(recall)
+                f1_scores.append(f1_score)
                 retrieval_times.append(retrieval_time)
                 
-                print(f"  📊 Retrieved: {len(retrieved_memories)} memories | Precision@5: {precision:.3f} | Time: {retrieval_time:.3f}s")
+                print(f"  📊 Retrieved: {len(retrieved_memories)} memories | Precision@5: {precision:.3f} | Recall@5: {recall:.3f} | F1: {f1_score:.3f} | Time: {retrieval_time:.3f}s")
                 
             except Exception as e:
                 print(f"  ❌ Error processing query: {e}")
@@ -294,30 +338,56 @@ class UnifiedMemoryBenchmark:
         
         if num_successful > 0:
             avg_precision = total_precision / num_successful
+            avg_recall = total_recall / num_successful
+            avg_f1 = total_f1 / num_successful
             avg_retrieval_time = total_retrieval_time / num_successful
             
-            # Calculate precision distribution
+            # Calculate distributions
             precision_scores.sort()
+            recall_scores.sort()
+            f1_scores.sort()
             retrieval_times.sort()
             
-            perfect_queries = sum(1 for p in precision_scores if p == 1.0)
-            zero_queries = sum(1 for p in precision_scores if p == 0.0)
+            perfect_precision_queries = sum(1 for p in precision_scores if p == 1.0)
+            zero_precision_queries = sum(1 for p in precision_scores if p == 0.0)
+            perfect_recall_queries = sum(1 for r in recall_scores if r == 1.0)
+            zero_recall_queries = sum(1 for r in recall_scores if r == 0.0)
+            perfect_f1_queries = sum(1 for f in f1_scores if f == 1.0)
+            zero_f1_queries = sum(1 for f in f1_scores if f == 0.0)
             
             results['summary'] = {
                 'num_queries': len(queries),
                 'successful_queries': num_successful,
                 'failed_queries': len(queries) - num_successful,
                 'average_precision_at_5': avg_precision,
+                'average_recall_at_5': avg_recall,
+                'average_f1_score': avg_f1,
                 'median_precision_at_5': precision_scores[len(precision_scores)//2] if precision_scores else 0,
+                'median_recall_at_5': recall_scores[len(recall_scores)//2] if recall_scores else 0,
+                'median_f1_score': f1_scores[len(f1_scores)//2] if f1_scores else 0,
                 'average_retrieval_time': avg_retrieval_time,
                 'median_retrieval_time': retrieval_times[len(retrieval_times)//2] if retrieval_times else 0,
-                'perfect_precision_queries': perfect_queries,
-                'zero_precision_queries': zero_queries,
+                'perfect_precision_queries': perfect_precision_queries,
+                'zero_precision_queries': zero_precision_queries,
+                'perfect_recall_queries': perfect_recall_queries,
+                'zero_recall_queries': zero_recall_queries,
+                'perfect_f1_queries': perfect_f1_queries,
+                'zero_f1_queries': zero_f1_queries,
                 'total_retrieval_time': total_retrieval_time,
                 'precision_distribution': {
                     'min': min(precision_scores) if precision_scores else 0,
                     'max': max(precision_scores) if precision_scores else 0,
                     'p95': precision_scores[int(len(precision_scores)*0.95)] if precision_scores else 0
+                },
+                'recall_distribution': {
+                    'min': min(recall_scores) if recall_scores else 0,
+                    'max': max(recall_scores) if recall_scores else 0,
+                    'p95': recall_scores[int(len(recall_scores)*0.95)] if recall_scores else 0
+                },
+                'f1_distribution': {
+                    'min': min(f1_scores) if f1_scores else 0,
+                    'max': max(f1_scores) if f1_scores else 0,
+                    'p95': f1_scores[int(len(f1_scores)*0.95)] if f1_scores else 0
                 },
                 'retrieval_time_distribution': {
                     'min': min(retrieval_times) if retrieval_times else 0,
@@ -377,10 +447,10 @@ def get_model_configs():
             "type": "transformers",
             "quantization": "bf16"
         },
-        "llama4": {
-            "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
+        "llama3.1-finetuned": {
+            "path": "kingJulio/llama-3.1-8b-memory-finetune",
             "type": "transformers",
-            "quantization": None
+            "quantization": "4bit"
         },
         "llama4-bf16": {
             "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
@@ -388,13 +458,8 @@ def get_model_configs():
             "quantization": "bf16"
         },
         "llama4-4bit": {
-            "path": "mlx-community/meta-llama-Llama-4-Scout-17B-16E-4bit",
+            "path": "unsloth/Llama-4-Scout-17B-16E-Instruct-unsloth-bnb-4bit",
             "type": "transformers",
-            "quantization": "4bit"
-        },
-        "llama4-gguf": {
-            "path": "/home/ubuntu/mem0-assignment/model_cache/scout_gguf/Q4_K_M",
-            "type": "gguf",
             "quantization": "4bit"
         }
     }
@@ -449,10 +514,12 @@ def main():
                 print("🎯 Using default memory benchmark (no specific model)")
         
         # Set output directory based on model
-        if args.model in ["llama4", "llama4-bf16", "llama4-4bit", "llama4-gguf"]:
+        if args.model in ["llama4-bf16", "llama4-4bit"]:
             output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
         elif args.model == "llama3.1-instruct-bf16":
-            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/base_model_results_bf16"
+            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/results/base_model_results_bf16"
+        elif args.model == "llama3.1-finetuned":
+            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/results/finetuned_results"
         else:
             output_dir = args.output_dir
         
@@ -493,12 +560,22 @@ def main():
             
             if summary['successful_queries'] > 0:
                 print(f"Average Precision@5: {summary['average_precision_at_5']:.3f}")
+                print(f"Average Recall@5: {summary['average_recall_at_5']:.3f}")
+                print(f"Average F1 Score: {summary['average_f1_score']:.3f}")
                 print(f"Median Precision@5: {summary['median_precision_at_5']:.3f}")
+                print(f"Median Recall@5: {summary['median_recall_at_5']:.3f}")
+                print(f"Median F1 Score: {summary['median_f1_score']:.3f}")
                 print(f"Perfect precision queries: {summary['perfect_precision_queries']}")
+                print(f"Perfect recall queries: {summary['perfect_recall_queries']}")
+                print(f"Perfect F1 queries: {summary['perfect_f1_queries']}")
                 print(f"Zero precision queries: {summary['zero_precision_queries']}")
+                print(f"Zero recall queries: {summary['zero_recall_queries']}")
+                print(f"Zero F1 queries: {summary['zero_f1_queries']}")
                 print(f"Average retrieval time: {summary['average_retrieval_time']:.3f}s")
                 print(f"Median retrieval time: {summary['median_retrieval_time']:.3f}s")
                 print(f"Precision range: {summary['precision_distribution']['min']:.3f} - {summary['precision_distribution']['max']:.3f}")
+                print(f"Recall range: {summary['recall_distribution']['min']:.3f} - {summary['recall_distribution']['max']:.3f}")
+                print(f"F1 range: {summary['f1_distribution']['min']:.3f} - {summary['f1_distribution']['max']:.3f}")
             
             print("="*70)
         

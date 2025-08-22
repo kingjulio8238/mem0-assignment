@@ -21,7 +21,7 @@ mem0-backend/model_cache/
 # Training artifacts - exclude model directories (available on HuggingFace)
 finetune/memory_model_final/
 finetune/memory_model_gguf_final/
-finetune/training_trials/trial_*/
+finetune/training_details/training_trials/trial_*/
 
 # Build artifacts and external repositories
 finetune/llama.cpp/
@@ -62,3 +62,5 @@ Thumbs.db
 .env.local
 .env.*.local
 models/ 
+
+memories.json 
