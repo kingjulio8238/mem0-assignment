@@ -34,12 +34,14 @@ class ComparisonVisualizer:
         # Color scheme for models
         self.colors = {
             "base_model": "#FF6B6B",      # Red
+            "base_bf16": "#9B59B6",      # Purple
             "finetuned_bf16": "#4ECDC4",  # Teal  
             "finetuned_q4km": "#45B7D1"  # Blue
         }
         
         self.model_labels = {
             "base_model": "Base Model\n(4-bit)",
+            "base_bf16": "Base Model\n(bf16)",
             "finetuned_bf16": "Fine-tuned\nBF16",
             "finetuned_q4km": "Fine-tuned\nQ4_K_M"
         }

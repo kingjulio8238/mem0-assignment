@@ -15,8 +15,9 @@ from typing import Dict, List, Any
 
 
 class BenchmarkComparator:
-    def __init__(self, base_dir: str, bf16_dir: str, q4km_dir: str, output_dir: str):
+    def __init__(self, base_dir: str, base_bf16_dir: str, bf16_dir: str, q4km_dir: str, output_dir: str):
         self.base_dir = Path(base_dir)
+        self.base_bf16_dir = Path(base_bf16_dir)
         self.bf16_dir = Path(bf16_dir)
         self.q4km_dir = Path(q4km_dir)
         self.output_dir = Path(output_dir)
@@ -29,9 +30,13 @@ class BenchmarkComparator:
         """Load all benchmark JSON files"""
         data = {}
         
-        # Load base model results
+        # Load base model results (4-bit)
         base_inference = self._find_and_load_file(self.base_dir, "inference_benchmark")
         base_memory = self._find_and_load_file(self.base_dir, "memory_benchmark")
+        
+        # Load base BF16 model results (e.g., Llama-3.1-8B-Instruct)
+        base_bf16_inference = self._find_and_load_file(self.base_bf16_dir, "inference_benchmark")
+        base_bf16_memory = self._find_and_load_file(self.base_bf16_dir, "memory_benchmark")
         
         # Load BF16 model results
         bf16_inference = self._find_and_load_file(self.bf16_dir, "inference_benchmark")
@@ -47,6 +52,12 @@ class BenchmarkComparator:
                 "memory": base_memory,
                 "name": "Base Model (4-bit)",
                 "model_path": base_inference.get("model_info", {}).get("model_path", "Unknown")
+            },
+            "base_bf16": {
+                "inference": base_bf16_inference,
+                "memory": base_bf16_memory,
+                "name": "Base Model (bf16)",
+                "model_path": base_bf16_inference.get("model_info", {}).get("model_path", "Unknown")
             },
             "finetuned_bf16": {
                 "inference": bf16_inference,
@@ -108,7 +119,7 @@ class BenchmarkComparator:
         # Calculate relative performance (base model as reference)
         base_metrics = comparison["models"]["base_model"]["metrics"]
         
-        for model_key in ["finetuned_bf16", "finetuned_q4km"]:
+        for model_key in ["base_bf16", "finetuned_bf16", "finetuned_q4km"]:
             model_metrics = comparison["models"][model_key]["metrics"]
             
             comparison["relative_performance"][model_key] = {
@@ -173,7 +184,7 @@ class BenchmarkComparator:
         # Calculate relative performance improvements
         base_metrics = comparison["models"]["base_model"]["metrics"]
         
-        for model_key in ["finetuned_bf16", "finetuned_q4km"]:
+        for model_key in ["base_bf16", "finetuned_bf16", "finetuned_q4km"]:
             model_metrics = comparison["models"][model_key]["metrics"]
             
             comparison["relative_performance"][model_key] = {
@@ -209,8 +220,10 @@ class BenchmarkComparator:
             "expected_vs_actual": {
                 "expected_precision_threshold": 0.6,
                 "base_precision": base_metrics["average_precision_at_5"],
+                "base_bf16_precision": comparison["models"]["base_bf16"]["metrics"]["average_precision_at_5"],
                 "bf16_precision": comparison["models"]["finetuned_bf16"]["metrics"]["average_precision_at_5"],
                 "q4km_precision": comparison["models"]["finetuned_q4km"]["metrics"]["average_precision_at_5"],
+                "base_bf16_meets_expectation": comparison["models"]["base_bf16"]["metrics"]["average_precision_at_5"] > 0.6,
                 "bf16_meets_expectation": comparison["models"]["finetuned_bf16"]["metrics"]["average_precision_at_5"] > 0.6,
                 "q4km_meets_expectation": comparison["models"]["finetuned_q4km"]["metrics"]["average_precision_at_5"] > 0.6
             },
@@ -273,10 +286,12 @@ class BenchmarkComparator:
     def _generate_executive_summary(self, inference_comp: Dict, memory_comp: Dict) -> Dict[str, Any]:
         """Generate executive summary of all comparisons"""
         base_inf = inference_comp["models"]["base_model"]["metrics"]
+        base_bf16_inf = inference_comp["models"]["base_bf16"]["metrics"]
         bf16_inf = inference_comp["models"]["finetuned_bf16"]["metrics"] 
         q4km_inf = inference_comp["models"]["finetuned_q4km"]["metrics"]
         
         base_mem = memory_comp["models"]["base_model"]["metrics"]
+        base_bf16_mem = memory_comp["models"]["base_bf16"]["metrics"]
         bf16_mem = memory_comp["models"]["finetuned_bf16"]["metrics"]
         q4km_mem = memory_comp["models"]["finetuned_q4km"]["metrics"]
         
@@ -292,6 +307,12 @@ class BenchmarkComparator:
                     "inference_throughput": f"{base_inf['average_throughput']:.2f} tok/s",
                     "memory_precision": f"{base_mem['average_precision_at_5']:.3f}",
                     "inference_latency": f"{base_inf['average_latency']:.2f}s"
+                },
+                "base_bf16": {
+                    "inference_throughput": f"{base_bf16_inf['average_throughput']:.2f} tok/s",
+                    "memory_precision": f"{base_bf16_mem['average_precision_at_5']:.3f}",
+                    "inference_latency": f"{base_bf16_inf['average_latency']:.2f}s",
+                    "vs_base_precision": f"{((base_bf16_mem['average_precision_at_5'] - base_mem['average_precision_at_5']) / base_mem['average_precision_at_5'] * 100):+.1f}%"
                 },
                 "finetuned_bf16": {
                     "inference_throughput": f"{bf16_inf['average_throughput']:.2f} tok/s",
@@ -316,6 +337,11 @@ class BenchmarkComparator:
                     "inference_speed_rank": 3,  # Slowest
                     "memory_quality_rank": self._rank_memory_quality("finetuned_bf16", memory_comp),
                     "trade_off_ratio": memory_comp["models"]["finetuned_bf16"]["metrics"]["average_precision_at_5"] / inference_comp["models"]["finetuned_bf16"]["metrics"]["average_throughput"]
+                },
+                "base_bf16": {
+                    "inference_speed_rank": self._rank_inference_speed("base_bf16", inference_comp),
+                    "memory_quality_rank": self._rank_memory_quality("base_bf16", memory_comp),
+                    "trade_off_ratio": memory_comp["models"]["base_bf16"]["metrics"]["average_precision_at_5"] / inference_comp["models"]["base_bf16"]["metrics"]["average_throughput"]
                 },
                 "q4km": {
                     "inference_speed_rank": self._rank_inference_speed("finetuned_q4km", inference_comp),
@@ -515,8 +541,9 @@ Generated: {report['metadata']['generated_at']}
 
 def main():
     parser = argparse.ArgumentParser(description="Compare benchmark results across models")
-    parser.add_argument("--base-results", required=True, help="Path to base model results directory")
-    parser.add_argument("--bf16-results", required=True, help="Path to BF16 model results directory")
+    parser.add_argument("--base-results", required=True, help="Path to base 4-bit results directory")
+    parser.add_argument("--base-bf16-results", required=True, help="Path to base bf16 results directory")
+    parser.add_argument("--bf16-results", required=True, help="Path to finetuned BF16 results directory")
     parser.add_argument("--q4km-results", required=True, help="Path to Q4_K_M model results directory")
     parser.add_argument("--output-dir", required=True, help="Output directory for comparison results")
     
@@ -524,12 +551,14 @@ def main():
     
     print("🚀 Starting benchmark comparison analysis...")
     print(f"📂 Base results: {args.base_results}")
+    print(f"📂 Base BF16 results: {args.base_bf16_results}")
     print(f"📂 BF16 results: {args.bf16_results}")
     print(f"📂 Q4_K_M results: {args.q4km_results}")
     print(f"📂 Output directory: {args.output_dir}")
     
     comparator = BenchmarkComparator(
         base_dir=args.base_results,
+        base_bf16_dir=args.base_bf16_results,
         bf16_dir=args.bf16_results,
         q4km_dir=args.q4km_results,
         output_dir=args.output_dir

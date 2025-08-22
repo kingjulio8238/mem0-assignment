@@ -372,6 +372,11 @@ def get_model_configs():
             "type": "transformers",
             "quantization": "4bit"
         },
+        "llama3.1-instruct-bf16": {
+            "path": "meta-llama/Llama-3.1-8B-Instruct",
+            "type": "transformers",
+            "quantization": "bf16"
+        },
         "llama4": {
             "path": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
             "type": "transformers",
@@ -446,6 +451,8 @@ def main():
         # Set output directory based on model
         if args.model in ["llama4", "llama4-bf16", "llama4-4bit", "llama4-gguf"]:
             output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
+        elif args.model == "llama3.1-instruct-bf16":
+            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/base_model_results_bf16"
         else:
             output_dir = args.output_dir
         

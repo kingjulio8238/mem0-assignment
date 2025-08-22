@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-08-19T08:18:47.286897",
+  "timestamp": "2025-08-22T09:36:57.429769",
   "models": {
     "base_model": {
       "name": "Base Model (4-bit)",
@@ -12,6 +12,20 @@
         "median_throughput": 18.215853442007354,
         "average_tokens_generated": 126.54,
         "total_prompts": 50,
+        "success_rate": 1.0
+      }
+    },
+    "base_bf16": {
+      "name": "Base Model (bf16)",
+      "model_path": "meta-llama/Llama-3.1-8B-Instruct",
+      "metrics": {
+        "average_latency": 1.9896422553062438,
+        "median_latency": 1.918365716934204,
+        "p95_latency": 1.9714581966400146,
+        "average_throughput": 65.80641894608844,
+        "median_throughput": 66.7400169538027,
+        "average_tokens_generated": 128.0,
+        "total_prompts": 100,
         "success_rate": 1.0
       }
     },
@@ -45,6 +59,12 @@
     }
   },
   "relative_performance": {
+    "base_bf16": {
+      "latency_ratio": 0.2851218299449785,
+      "throughput_ratio": 3.627454983960632,
+      "latency_change_percent": -71.48781700550215,
+      "throughput_change_percent": 262.74549839606317
+    },
     "finetuned_bf16": {
       "latency_ratio": 2.5098393734124618,
       "throughput_ratio": 0.3582268981828854,
@@ -60,16 +80,16 @@
   },
   "statistical_analysis": {
     "latency": {
-      "fastest_model": "base_model",
+      "fastest_model": "base_bf16",
       "slowest_model": "finetuned_bf16",
-      "speed_range": 10.535988130569457,
-      "coefficient_of_variation": 0.459393281682437
+      "speed_range": 15.524563767910003,
+      "coefficient_of_variation": 0.6665462464913965
     },
     "throughput": {
-      "highest_throughput": "base_model",
+      "highest_throughput": "base_bf16",
       "lowest_throughput": "finetuned_bf16",
-      "throughput_range": 11.642539960729135,
-      "coefficient_of_variation": 0.37394048990652234
+      "throughput_range": 59.307749922264506,
+      "coefficient_of_variation": 0.8643081993766161
     }
   }
 }

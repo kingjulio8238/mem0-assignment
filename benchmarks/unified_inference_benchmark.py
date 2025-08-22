@@ -508,6 +508,11 @@ def get_model_configs():
             "type": "transformers",
             "quantization": "4bit"
         },
+        "llama-3.1-8b-instruct-bf16": {
+            "path": "meta-llama/Llama-3.1-8B-Instruct",
+            "type": "transformers",
+            "quantization": "bf16"
+        },
         "llama-3.1-bf16-gguf": {
             "path": "/home/ubuntu/mem0-assignment/model_cache/finetuned_gguf/unsloth.BF16.gguf",
             "type": "gguf",
@@ -597,6 +602,8 @@ def main():
                 output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results_4bit"
             else:
                 output_dir = "/home/ubuntu/mem0-assignment/benchmarks/scout/base_model_results"
+        elif args.model == "llama-3.1-8b-instruct-bf16":
+            output_dir = "/home/ubuntu/mem0-assignment/benchmarks/base_model_results_bf16"
         else:
             output_dir = args.output_dir
         

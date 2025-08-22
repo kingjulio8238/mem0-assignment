@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-08-19T08:18:47.287106",
+  "timestamp": "2025-08-22T09:36:57.430108",
   "models": {
     "base_model": {
       "name": "Base Model (4-bit)",
@@ -9,6 +9,21 @@
         "median_precision_at_5": 0.4,
         "average_retrieval_time": 0.27933238801502047,
         "median_retrieval_time": 0.25061821937561035,
+        "perfect_precision_queries": 1,
+        "zero_precision_queries": 2,
+        "total_queries": 21,
+        "success_rate": 1.0,
+        "precision_p95": 0.8
+      }
+    },
+    "base_bf16": {
+      "name": "Base Model (bf16)",
+      "model_path": "meta-llama/Llama-3.1-8B-Instruct",
+      "metrics": {
+        "average_precision_at_5": 0.4761904761904764,
+        "median_precision_at_5": 0.4,
+        "average_retrieval_time": 0.27192005657014395,
+        "median_retrieval_time": 0.2311389446258545,
         "perfect_precision_queries": 1,
         "zero_precision_queries": 2,
         "total_queries": 21,
@@ -48,6 +63,14 @@
     }
   },
   "relative_performance": {
+    "base_bf16": {
+      "precision_improvement": 0.0,
+      "precision_improvement_percent": 0.0,
+      "retrieval_time_ratio": 0.973464117435326,
+      "retrieval_time_change_percent": -2.6535882564673945,
+      "perfect_queries_improvement": 0,
+      "zero_queries_change": 0
+    },
     "finetuned_bf16": {
       "precision_improvement": 0.0,
       "precision_improvement_percent": 0.0,
@@ -70,8 +93,8 @@
       "best_model": "finetuned_q4km",
       "worst_model": "base_model",
       "precision_range": 0.009523809523809545,
-      "mean_precision": 0.4793650793650796,
-      "std_precision": 0.004489566864676502
+      "mean_precision": 0.4785714285714288,
+      "std_precision": 0.004123930494211622
     },
     "retrieval_time": {
       "fastest_model": "finetuned_q4km",
@@ -83,8 +106,10 @@
     "expected_vs_actual": {
       "expected_precision_threshold": 0.6,
       "base_precision": 0.4761904761904764,
+      "base_bf16_precision": 0.4761904761904764,
       "bf16_precision": 0.4761904761904764,
       "q4km_precision": 0.48571428571428593,
+      "base_bf16_meets_expectation": false,
       "bf16_meets_expectation": false,
       "q4km_meets_expectation": false
     },

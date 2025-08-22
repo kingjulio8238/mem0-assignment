@@ -7,6 +7,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 # Available models
 MODELS = {
     "llama3.1": "unsloth/llama-3.1-8b-bnb-4bit",
+    "llama3.1-instruct-bf16": "meta-llama/Llama-3.1-8B-Instruct",
     "llama4": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
     "llama4-bf16": "/home/ubuntu/mem0-assignment/mem0-backend/model_cache/models--meta-llama--Llama-4-Scout-17B-16E-Instruct",
     "llama4-4bit": "mlx-community/meta-llama-Llama-4-Scout-17B-16E-4bit",
@@ -21,6 +22,9 @@ def load_model(model_choice):
     if model_choice == "llama3.1":
         model_name = "Llama 3.1 8B (4-bit)"
         quantization = "4bit"
+    elif model_choice == "llama3.1-instruct-bf16":
+        model_name = "Llama 3.1 8B Instruct (bf16)"
+        quantization = "bf16"
     elif model_choice == "llama4":
         model_name = "Llama 4 Scout 17B (default)"
         quantization = None
@@ -116,7 +120,7 @@ def load_model(model_choice):
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Test Mem0 with different Llama models")
-parser.add_argument("--model", choices=["llama3.1", "llama4", "llama4-bf16", "llama4-4bit", "llama4-gguf"], default="llama3.1",
+parser.add_argument("--model", choices=["llama3.1", "llama3.1-instruct-bf16", "llama4", "llama4-bf16", "llama4-4bit", "llama4-gguf"], default="llama3.1",
                    help="Choose which model to use (default: llama3.1)")
 args = parser.parse_args()
 
@@ -196,6 +200,8 @@ def chat_with_memory(user_input, user_id="alice"):
 if __name__ == "__main__":
     if args.model == "llama3.1":
         model_name = "Llama 3.1 8B (4-bit)"
+    elif args.model == "llama3.1-instruct-bf16":
+        model_name = "Llama 3.1 8B Instruct (bf16)"
     elif args.model == "llama4":
         model_name = "Llama 4 Scout 17B (default)"
     elif args.model == "llama4-bf16":
@@ -250,6 +256,7 @@ def get_model_choice_for_benchmark(benchmark_model_name):
     """
     mapping = {
         "llama3.1": "llama3.1",
+        "llama3.1-instruct-bf16": "llama3.1-instruct-bf16",
         "llama4": "llama4",
         "llama4-bf16": "llama4-bf16", 
         "llama4-4bit": "llama4-4bit",

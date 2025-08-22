@@ -1,9 +1,10 @@
 {
   "metadata": {
-    "generated_at": "2025-08-19T08:18:47.287242",
+    "generated_at": "2025-08-22T09:36:57.430182",
     "comparison_type": "comprehensive_model_analysis",
     "models_compared": [
       "base_model",
+      "base_bf16",
       "finetuned_bf16",
       "finetuned_q4km"
     ],
@@ -14,7 +15,7 @@
   },
   "executive_summary": {
     "key_findings": {
-      "fastest_inference": "base_model",
+      "fastest_inference": "base_bf16",
       "best_memory_precision": "finetuned_q4km",
       "fine_tuning_improved_memory": true,
       "quantization_preserves_quality": true
@@ -24,6 +25,12 @@
         "inference_throughput": "18.14 tok/s",
         "memory_precision": "0.476",
         "inference_latency": "6.98s"
+      },
+      "base_bf16": {
+        "inference_throughput": "65.81 tok/s",
+        "memory_precision": "0.476",
+        "inference_latency": "1.99s",
+        "vs_base_precision": "+0.0%"
       },
       "finetuned_bf16": {
         "inference_throughput": "6.50 tok/s",
@@ -40,7 +47,7 @@
     }
   },
   "inference_analysis": {
-    "timestamp": "2025-08-19T08:18:47.286897",
+    "timestamp": "2025-08-22T09:36:57.429769",
     "models": {
       "base_model": {
         "name": "Base Model (4-bit)",
@@ -53,6 +60,20 @@
           "median_throughput": 18.215853442007354,
           "average_tokens_generated": 126.54,
           "total_prompts": 50,
+          "success_rate": 1.0
+        }
+      },
+      "base_bf16": {
+        "name": "Base Model (bf16)",
+        "model_path": "meta-llama/Llama-3.1-8B-Instruct",
+        "metrics": {
+          "average_latency": 1.9896422553062438,
+          "median_latency": 1.918365716934204,
+          "p95_latency": 1.9714581966400146,
+          "average_throughput": 65.80641894608844,
+          "median_throughput": 66.7400169538027,
+          "average_tokens_generated": 128.0,
+          "total_prompts": 100,
           "success_rate": 1.0
         }
       },
@@ -86,6 +107,12 @@
       }
     },
     "relative_performance": {
+      "base_bf16": {
+        "latency_ratio": 0.2851218299449785,
+        "throughput_ratio": 3.627454983960632,
+        "latency_change_percent": -71.48781700550215,
+        "throughput_change_percent": 262.74549839606317
+      },
       "finetuned_bf16": {
         "latency_ratio": 2.5098393734124618,
         "throughput_ratio": 0.3582268981828854,
@@ -101,21 +128,21 @@
     },
     "statistical_analysis": {
       "latency": {
-        "fastest_model": "base_model",
+        "fastest_model": "base_bf16",
         "slowest_model": "finetuned_bf16",
-        "speed_range": 10.535988130569457,
-        "coefficient_of_variation": 0.459393281682437
+        "speed_range": 15.524563767910003,
+        "coefficient_of_variation": 0.6665462464913965
       },
       "throughput": {
-        "highest_throughput": "base_model",
+        "highest_throughput": "base_bf16",
         "lowest_throughput": "finetuned_bf16",
-        "throughput_range": 11.642539960729135,
-        "coefficient_of_variation": 0.37394048990652234
+        "throughput_range": 59.307749922264506,
+        "coefficient_of_variation": 0.8643081993766161
       }
     }
   },
   "memory_analysis": {
-    "timestamp": "2025-08-19T08:18:47.287106",
+    "timestamp": "2025-08-22T09:36:57.430108",
     "models": {
       "base_model": {
         "name": "Base Model (4-bit)",
@@ -125,6 +152,21 @@
           "median_precision_at_5": 0.4,
           "average_retrieval_time": 0.27933238801502047,
           "median_retrieval_time": 0.25061821937561035,
+          "perfect_precision_queries": 1,
+          "zero_precision_queries": 2,
+          "total_queries": 21,
+          "success_rate": 1.0,
+          "precision_p95": 0.8
+        }
+      },
+      "base_bf16": {
+        "name": "Base Model (bf16)",
+        "model_path": "meta-llama/Llama-3.1-8B-Instruct",
+        "metrics": {
+          "average_precision_at_5": 0.4761904761904764,
+          "median_precision_at_5": 0.4,
+          "average_retrieval_time": 0.27192005657014395,
+          "median_retrieval_time": 0.2311389446258545,
           "perfect_precision_queries": 1,
           "zero_precision_queries": 2,
           "total_queries": 21,
@@ -164,6 +206,14 @@
       }
     },
     "relative_performance": {
+      "base_bf16": {
+        "precision_improvement": 0.0,
+        "precision_improvement_percent": 0.0,
+        "retrieval_time_ratio": 0.973464117435326,
+        "retrieval_time_change_percent": -2.6535882564673945,
+        "perfect_queries_improvement": 0,
+        "zero_queries_change": 0
+      },
       "finetuned_bf16": {
         "precision_improvement": 0.0,
         "precision_improvement_percent": 0.0,
@@ -186,8 +236,8 @@
         "best_model": "finetuned_q4km",
         "worst_model": "base_model",
         "precision_range": 0.009523809523809545,
-        "mean_precision": 0.4793650793650796,
-        "std_precision": 0.004489566864676502
+        "mean_precision": 0.4785714285714288,
+        "std_precision": 0.004123930494211622
       },
       "retrieval_time": {
         "fastest_model": "finetuned_q4km",
@@ -199,8 +249,10 @@
       "expected_vs_actual": {
         "expected_precision_threshold": 0.6,
         "base_precision": 0.4761904761904764,
+        "base_bf16_precision": 0.4761904761904764,
         "bf16_precision": 0.4761904761904764,
         "q4km_precision": 0.48571428571428593,
+        "base_bf16_meets_expectation": false,
         "bf16_meets_expectation": false,
         "q4km_meets_expectation": false
       },
@@ -217,24 +269,29 @@
     "speed_vs_memory_quality": {
       "bf16": {
         "inference_speed_rank": 3,
-        "memory_quality_rank": 3,
+        "memory_quality_rank": 4,
         "trade_off_ratio": 0.07327507747275255
       },
+      "base_bf16": {
+        "inference_speed_rank": 1,
+        "memory_quality_rank": 3,
+        "trade_off_ratio": 0.00723623141658252
+      },
       "q4km": {
-        "inference_speed_rank": 2,
+        "inference_speed_rank": 3,
         "memory_quality_rank": 1,
         "trade_off_ratio": 0.0300791084687619
       },
       "base": {
-        "inference_speed_rank": 1,
+        "inference_speed_rank": 2,
         "memory_quality_rank": 2,
         "trade_off_ratio": 0.026249103717174767
       }
     },
     "model_efficiency": {
-      "most_efficient_overall": "base_model",
+      "most_efficient_overall": "base_bf16",
       "best_for_memory_tasks": "finetuned_q4km",
-      "best_for_speed_tasks": "base_model"
+      "best_for_speed_tasks": "base_bf16"
     }
   },
   "recommendations": {
@@ -248,7 +305,7 @@
         "reason": "Highest memory retrieval precision"
       },
       "speed_critical_applications": {
-        "recommended_model": "base_model",
+        "recommended_model": "base_bf16",
         "reason": "Fastest inference with acceptable memory performance"
       },
       "resource_constrained_environments": {

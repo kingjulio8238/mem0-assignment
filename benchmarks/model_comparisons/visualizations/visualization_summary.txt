@@ -1,6 +1,6 @@
 
 # 📊 Visualization Summary
-Generated: 2025-08-19T08:22:34.067808
+Generated: 2025-08-22T09:39:53.791406
 
 ## 📈 Generated Charts:
 
@@ -13,9 +13,9 @@ Generated: 2025-08-19T08:22:34.067808
 ## 🎯 Key Insights from Visualizations:
 
 ### Performance Rankings:
-- **Fastest Inference:** base_model
+- **Fastest Inference:** base_bf16
 - **Best Memory:** finetuned_q4km
-- **Most Efficient:** base_model
+- **Most Efficient:** base_bf16
 
 ### Fine-tuning Success:
 - **Memory Improvement:** ✅ Achieved
@@ -24,7 +24,7 @@ Generated: 2025-08-19T08:22:34.067808
 ### Recommendations:
 - **Production Use:** finetuned_q4km
 - **Memory-Critical:** finetuned_q4km
-- **Speed-Critical:** base_model
+- **Speed-Critical:** base_bf16
 
 ## 📁 Files Location:
-All charts saved to: model_comparisons/visualizations
+All charts saved to: /home/ubuntu/mem0-assignment/benchmarks/model_comparisons/visualizations

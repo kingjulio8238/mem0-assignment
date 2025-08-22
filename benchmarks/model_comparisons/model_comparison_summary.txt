@@ -1,11 +1,11 @@
 
 # 🚀 Model Comparison Analysis Summary
-Generated: 2025-08-19T08:18:47.287242
+Generated: 2025-08-22T09:36:57.430182
 
 ## 📊 Executive Summary
 
 ### Key Findings:
-- **Fastest Inference:** base_model
+- **Fastest Inference:** base_bf16
 - **Best Memory Precision:** finetuned_q4km
 - **Fine-tuning Improved Memory:** ✅ Yes
 - **Quantization Preserves Quality:** ✅ Yes
@@ -35,7 +35,7 @@ Generated: 2025-08-19T08:18:47.287242
 **Reason:** Highest memory retrieval precision
 
 ### Speed-Critical Applications
-**Recommended:** base_model
+**Recommended:** base_bf16
 **Reason:** Fastest inference with acceptable memory performance
 
 ## 🔬 Fine-tuning Assessment
@@ -53,8 +53,8 @@ Generated: 2025-08-19T08:18:47.287242
 ## 📈 Detailed Metrics
 
 ### Inference Performance
-- **Fastest Model:** base_model
-- **Highest Throughput:** base_model
+- **Fastest Model:** base_bf16
+- **Highest Throughput:** base_bf16
 
 ### Memory Performance  
 - **Best Precision:** finetuned_q4km
