@@ -1,7 +1,11 @@
 # Mem0 Assignment
 
 **Project TLDR**: 
-Memory-focused pipeline - wrap models with Mem0, benchmark baselines (inference and memory), fine-tune models,benchmark fine-tuned model performance, run analyses and integrate with memory storage/retrieval via CLI.
+1. Wrap models with Mem0,
+2. Benchmark base models (inference and memory), 
+3. Fine-tune models using Unsloth,
+4. Benchmark fine-tuned models, 
+5. Run analyses & integrate with memory storage/retrieval via CLI.
 
 ## Demo
 
@@ -147,7 +151,7 @@ mem0 benchmark compare --base-results results/base_model_results_4bit --bf16-res
 
 ## Fine-tuned Models
 
-*Had issues with loading the scout model  
+*NOTE: Had issues with loading the scout model  
 
 ### 🤖 Llama 3.1 8B Memory-Finetuned
 
@@ -156,30 +160,3 @@ mem0 benchmark compare --base-results results/base_model_results_4bit --bf16-res
 [![Model Size](https://img.shields.io/badge/Size-8B%20Parameters-orange)](https://huggingface.co/kingJulio/llama-3.1-8b-memory-finetune)
 
 **Model**: [kingJulio/llama-3.1-8b-memory-finetune](https://huggingface.co/kingJulio/llama-3.1-8b-memory-finetune)
-
-**Base Model**: Meta-Llama-3.1-8B-Instruct
-
-**Fine-tuning**: Memory-focused instruction tuning on synthetic memory datasets
-
-**Use Cases**:
-- Memory-augmented conversations
-- Contextual memory retrieval
-- Personalized AI interactions
-- Long-term memory management
-
-**Quick Start**:
-```python
-from transformers import AutoTokenizer, AutoModelForCausalLM
-
-model_name = "kingJulio/llama-3.1-8b-memory-finetune"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
-
-# Memory-enhanced conversation
-prompt = "User memory: I love coding in Python\nUser: What should I work on today?"
-inputs = tokenizer(prompt, return_tensors="pt")
-outputs = model.generate(**inputs, max_length=200)
-response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-```
-
-**Performance**: Optimized for memory retrieval accuracy and contextual understanding 
