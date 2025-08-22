@@ -3,6 +3,10 @@
 **Project TLDR**: 
 Memory-focused pipeline - wrap models with Mem0, benchmark baselines (inference and memory), fine-tune models,benchmark fine-tuned model performance, run analyses and integrate with memory storage/retrieval via CLI.
 
+## Demo
+
+https://drive.google.com/file/d/1D5KnnD1ZgHSvLG1ybNXcuRP8zRiFeLUY/view?usp=sharing
+
 ## Directory Structure
 
 ```
