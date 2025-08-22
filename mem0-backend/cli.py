@@ -6,9 +6,10 @@ Mem0 CLI - A minimal command-line interface for storing and recalling user memor
 import argparse
 import sys
 import json
+import torch
 from typing import Optional, List, Dict, Any
 from mem0 import Memory
-from wrap import load_model, generate_with_local_model
+from wrap import load_model
 
 class Mem0CLI:
     def __init__(self, model_choice: str = "llama3.1"):
@@ -68,9 +69,25 @@ class Mem0CLI:
             if relevant_memories:
                 memory_context = "\nRelevant memories:\n" + "\n".join([mem['memory'] for mem in relevant_memories])
             
-            # Generate response
+            # Generate response using the model directly
             prompt = f"User: {user_input}{memory_context}\nAssistant:"
-            response = generate_with_local_model(prompt, max_length=256)
+            inputs = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
+            inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
+            
+            import torch
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    max_new_tokens=256,
+                    temperature=0.7,
+                    do_sample=True,
+                    pad_token_id=self.tokenizer.eos_token_id
+                )
+            
+            generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            # Remove the input prompt from the generated text
+            prompt_length = len(prompt)
+            response = generated_text[prompt_length:].strip()
             
             # Store the conversation
             conversation = f"User said: {user_input}. Assistant responded: {response}"
@@ -142,10 +159,17 @@ Examples:
   python cli.py search "basketball" --user alice
   
   # Chat with memory (requires model)
-  python cli.py chat "What sports do I like?" --user alice --model llama3.1
+  python cli.py chat "What sports do I like?" --user alice --model llama3.1-finetuned
   
   # Add memory with custom format
   python cli.py add "I enjoy reading sci-fi" --user bob --format json
+
+Available Models for Chat:
+  llama3.1              - Llama 3.1 8B (4-bit)
+  llama3.1-instruct-bf16 - Llama 3.1 8B Instruct (bf16)
+  llama3.1-finetuned    - Llama 3.1 8B Memory Finetuned
+  llama4-bf16           - Llama 4 Scout 17B (bf16)
+  llama4-4bit           - Llama 4 Scout 17B (4-bit)
         """
     )
     
@@ -169,16 +193,14 @@ Examples:
     chat_parser.add_argument("message", help="User message")
     chat_parser.add_argument("--user", "-u", default="default", help="User ID (default: default)")
     chat_parser.add_argument("--format", "-f", choices=["text", "json"], default="text", help="Output format")
+    chat_parser.add_argument("--model", "-m", 
+                           choices=["llama3.1", "llama3.1-instruct-bf16", "llama3.1-finetuned", "llama4-bf16", "llama4-4bit"],
+                           required=True,
+                           help="Model to use for chat functionality")
     
     # List users command
     list_parser = subparsers.add_parser("list-users", help="List all users")
     list_parser.add_argument("--format", "-f", choices=["text", "json"], default="text", help="Output format")
-    
-    # Global options
-    parser.add_argument("--model", "-m", 
-                       choices=["none", "llama3.1", "llama3.1-instruct-bf16", "llama3.1-finetuned", "llama4-bf16", "llama4-4bit"],
-                       default="none",
-                       help="Model to use for chat functionality (default: none)")
     
     args = parser.parse_args()
     
@@ -186,8 +208,8 @@ Examples:
         parser.print_help()
         return
     
-    # Initialize CLI
-    cli = Mem0CLI(args.model)
+    # Initialize CLI without model (models are loaded per command as needed)
+    cli = Mem0CLI("none")
     
     # Execute command
     if args.command == "add":
@@ -199,6 +221,11 @@ Examples:
         print(format_output(result, args.format))
     
     elif args.command == "chat":
+        # Get model from chat parser (now required)
+        model_choice = args.model
+        
+        # Initialize CLI with the specified model
+        cli = Mem0CLI(model_choice)
         result = cli.chat_with_memory(args.message, args.user)
         print(format_output(result, args.format))
     

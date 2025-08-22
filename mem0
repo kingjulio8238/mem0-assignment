@@ -91,8 +91,16 @@ Interactive Commands:
 Examples:
   > memory add "I love basketball" --user alice
   > memory search "sports" --user alice
+  > memory chat "What sports do I like?" --user alice --model llama3.1-finetuned
   > benchmark inference --model llama3.1 --num-prompts 100
   > train --max-trials 3 --num-epochs 2
+
+Available Models for Chat:
+  llama3.1              - Llama 3.1 8B (4-bit)
+  llama3.1-instruct-bf16 - Llama 3.1 8B Instruct (bf16)
+  llama3.1-finetuned    - Llama 3.1 8B Memory Finetuned
+  llama4-bf16           - Llama 4 Scout 17B (bf16)
+  llama4-4bit           - Llama 4 Scout 17B (4-bit)
 """)
 
 def interactive_mode():
@@ -141,6 +149,12 @@ Type 'help' for available commands, 'exit' to quit.
                     print("  search <query>    - Search memories")
                     print("  chat <message>    - Chat with memory integration")
                     print("  list-users        - List all users")
+                    print("")
+                    print("Chat options:")
+                    print("  --model <model>   - Specify model (llama3.1, llama3.1-finetuned, etc.)")
+                    print("  --user <user>     - Specify user ID")
+                    print("")
+                    print("Example: memory chat 'What do I like?' --user alice --model llama3.1-finetuned")
                     continue
                 
                 subcommand = remaining[0]
@@ -227,6 +241,12 @@ def memory_command(args):
         print("  search <query>    - Search memories")
         print("  chat <message>    - Chat with memory integration")
         print("  list-users        - List all users")
+        print("")
+        print("Chat options:")
+        print("  --model <model>   - Specify model (llama3.1, llama3.1-finetuned, etc.)")
+        print("  --user <user>     - Specify user ID")
+        print("")
+        print("Example: mem0 memory chat 'What do I like?' --user alice --model llama3.1-finetuned")
         return
     
     # Build the command for the memory backend
@@ -250,6 +270,8 @@ def memory_command(args):
 
 def train_command(args):
     """Handle training commands"""
+    print("🚀 Starting fine-tuning...")
+    
     # Build the command for training
     cmd = [sys.executable, f"{PROJECT_ROOT}/finetune/train.py"]
     
@@ -336,6 +358,12 @@ def main():
             print("  search <query>    - Search memories")
             print("  chat <message>    - Chat with memory integration")
             print("  list-users        - List all users")
+            print("")
+            print("Chat options:")
+            print("  --model <model>   - Specify model (llama3.1, llama3.1-finetuned, etc.)")
+            print("  --user <user>     - Specify user ID")
+            print("")
+            print("Example: mem0 memory chat 'What do I like?' --user alice --model llama3.1-finetuned")
             return 0
         
         args.subcommand = sys.argv[2]

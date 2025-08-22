@@ -30,12 +30,14 @@ class UnifiedMemoryBenchmark:
         self.model_type = model_type
         self.user_id = f"benchmark_user_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
-        # Import memory functions and set up model if specified
+        # Import memory functions directly from mem0 module
         try:
-            from wrap import add_memory, search_memory, memory, get_model_choice_for_benchmark
-            self.add_memory = add_memory
-            self.search_memory = search_memory
-            self.memory = memory
+            from mem0 import Memory
+            
+            # Create a fresh memory instance for this benchmark
+            self.memory = Memory()
+            self.add_memory = self.memory.add
+            self.search_memory = self.memory.search
             
             # If a model is specified, we need to ensure the correct model is loaded
             if model_path:

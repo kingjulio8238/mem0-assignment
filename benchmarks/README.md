@@ -6,10 +6,12 @@
 
 ```bash
 # Test inference speed
-python scripts/unified_inference_benchmark.py --model llama-3.1-8b-instruct-bf16 --num-prompts 100
+python scripts/unified_inference_benchmark.py --model llama3.1-instruct-bf16 --num-prompts 100
 
 # Test memory retrieval
 python scripts/unified_memory_benchmark.py --model llama3.1-instruct-bf16
+
+#fine-tuned model: --model llama3.1-finetuned 
 
 # Compare all models and generate reports
 python benchmark_comparison_analysis.py \
@@ -32,9 +34,12 @@ python generate_comparison_plots.py --comparison-results model_comparisons --out
 
 ## Available Models
 
-**Inference**: `llama-3.1-8b-bnb-4bit`, `llama-3.1-8b-instruct-bf16`, `llama-3.1-bf16-gguf`, `llama-3.1-q4km-gguf`, `llama4-bf16`, `llama4-4bit`, `llama4-gguf`
-
-**Memory**: `llama-3.1-8b-bnb-4bit`, `llama3.1-instruct-bf16`, `llama-3.1-bf16-gguf`, `llama-3.1-q4km-gguf`, `llama4-bf16`, `llama4-4bit`, `llama4-gguf`
+**Inference & Memory**: 
+- `llama3.1` - Llama 3.1 8B (4-bit quantized)
+- `llama3.1-instruct-bf16` - Llama 3.1 8B Instruct (bf16)
+- `llama3.1-finetuned` - Llama 3.1 8B Memory Finetuned
+- `llama4-bf16` - Llama 4 Scout 17B (bf16)
+- `llama4-4bit` - Llama 4 Scout 17B (4-bit quantized)
 
 ## Output
 
