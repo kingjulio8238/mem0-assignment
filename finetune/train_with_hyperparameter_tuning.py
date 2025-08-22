@@ -27,6 +27,7 @@ from datetime import datetime
 from unsloth import FastLanguageModel
 from transformers import TrainingArguments
 from trl import SFTTrainer
+from accelerate import Accelerator
 # Note: HuggingFace upload functionality moved to upload_to_hf.py
 import os
 
@@ -34,22 +35,37 @@ import os
 class VRAMMonitor:
     """Monitor and manage VRAM usage during training."""
     
-    def __init__(self):
+    def __init__(self, device_count: int = None):
+        self.device_count = device_count or torch.cuda.device_count()
         self.initial_memory = self.get_gpu_memory()
-        self.peak_memory = 0
+        self.peak_memory = [0] * self.device_count
         self.memory_history = []
     
     def get_gpu_memory(self) -> Dict[str, float]:
-        """Get current GPU memory usage in GB."""
-        if torch.cuda.is_available():
-            memory_allocated = torch.cuda.memory_allocated() / 1024**3
-            memory_reserved = torch.cuda.memory_reserved() / 1024**3
-            memory_free = (torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved()) / 1024**3
+        """Get current GPU memory usage in GB across all devices."""
+        if torch.cuda.is_available() and self.device_count > 0:
+            total_allocated = 0
+            total_reserved = 0
+            total_free = 0
+            total_memory = 0
+            
+            for device_id in range(self.device_count):
+                with torch.cuda.device(device_id):
+                    allocated = torch.cuda.memory_allocated(device_id) / 1024**3
+                    reserved = torch.cuda.memory_reserved(device_id) / 1024**3
+                    device_total = torch.cuda.get_device_properties(device_id).total_memory / 1024**3
+                    free = device_total - reserved
+                    
+                    total_allocated += allocated
+                    total_reserved += reserved
+                    total_free += free
+                    total_memory += device_total
+            
             return {
-                "allocated": memory_allocated,
-                "reserved": memory_reserved, 
-                "free": memory_free,
-                "total": torch.cuda.get_device_properties(0).total_memory / 1024**3
+                "allocated": total_allocated,
+                "reserved": total_reserved, 
+                "free": total_free,
+                "total": total_memory
             }
         return {"allocated": 0, "reserved": 0, "free": 0, "total": 0}
     
@@ -64,11 +80,16 @@ class VRAMMonitor:
         }
     
     def log_memory_usage(self, stage: str = ""):
-        """Log current memory usage."""
+        """Log current memory usage across all GPUs."""
         gpu_mem = self.get_gpu_memory()
         sys_mem = self.get_system_memory()
         
-        self.peak_memory = max(self.peak_memory, gpu_mem["allocated"])
+        # Update peak memory tracking
+        for device_id in range(self.device_count):
+            if torch.cuda.is_available():
+                device_allocated = torch.cuda.memory_allocated(device_id) / 1024**3
+                self.peak_memory[device_id] = max(self.peak_memory[device_id], device_allocated)
+        
         self.memory_history.append({
             "stage": stage,
             "timestamp": time.time(),
@@ -77,15 +98,25 @@ class VRAMMonitor:
         })
         
         print(f"\n=== Memory Usage {stage} ===")
-        print(f"GPU: {gpu_mem['allocated']:.2f}GB / {gpu_mem['total']:.2f}GB ({gpu_mem['allocated']/gpu_mem['total']*100:.1f}%)")
+        print(f"Total GPU: {gpu_mem['allocated']:.2f}GB / {gpu_mem['total']:.2f}GB ({gpu_mem['allocated']/gpu_mem['total']*100:.1f}%)")
+        
+        # Per-device breakdown
+        for device_id in range(self.device_count):
+            if torch.cuda.is_available():
+                device_allocated = torch.cuda.memory_allocated(device_id) / 1024**3
+                device_total = torch.cuda.get_device_properties(device_id).total_memory / 1024**3
+                print(f"  GPU {device_id}: {device_allocated:.2f}GB / {device_total:.2f}GB")
+        
         print(f"System RAM: {sys_mem['used']:.2f}GB / {sys_mem['total']:.2f}GB ({sys_mem['percent']:.1f}%)")
         
     def clear_cache(self):
-        """Clear GPU cache to free memory."""
+        """Clear GPU cache to free memory on all devices."""
         if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+            for device_id in range(self.device_count):
+                with torch.cuda.device(device_id):
+                    torch.cuda.empty_cache()
         gc.collect()
-        print("🧹 Cleared GPU cache and garbage collection")
+        print(f"🧹 Cleared GPU cache on {self.device_count} devices and garbage collection")
 
 
 class HyperparameterTuner:
@@ -425,7 +456,14 @@ class AdvancedMemoryTrainer:
     
     def __init__(self, model_name: str = "unsloth/llama-3.1-8b-bnb-4bit", enable_plotting: bool = True):
         self.model_name = model_name
-        self.vram_monitor = VRAMMonitor()
+        
+        # Initialize accelerator for distributed training
+        self.accelerator = Accelerator()
+        self.device_count = torch.cuda.device_count()
+        self.vram_monitor = VRAMMonitor(self.device_count)
+        
+        print(f"🚀 Initialized with {self.device_count} GPUs")
+        print(f"Primary device: {self.accelerator.device}")
         
         # Determine model type and configure accordingly first
         self.model_type = self._determine_model_type(model_name)
@@ -544,28 +582,31 @@ class AdvancedMemoryTrainer:
                 self.vram_monitor.clear_cache()
             
             print(f"\n🚀 Loading model with config: {config}")
+            print(f"🔀 Using {self.device_count} GPUs for distributed loading")
             
             # Check available VRAM before loading
             gpu_memory = self.vram_monitor.get_gpu_memory()
-            if gpu_memory["free"] < 2.0:  # Need at least 2GB free
+            if gpu_memory["free"] < 4.0:  # Need more free memory for multi-GPU
                 print(f"⚠️ Warning: Low GPU memory ({gpu_memory['free']:.1f}GB free)")
                 self.vram_monitor.clear_cache()
             
-            # Load model with configuration using Unsloth
-            # Both Llama 3.1 and Scout models should work with FastLanguageModel
+            # Create device map for multi-GPU loading
+            device_map = "auto" if self.device_count > 1 else None
+            
+            # Load model with configuration using Unsloth with device mapping
             self.model, self.tokenizer = FastLanguageModel.from_pretrained(
                 model_name=self.model_name,
                 max_seq_length=config["max_seq_length"],
                 dtype=None,  # Auto-detect
                 load_in_4bit=True,  # Always use 4-bit for memory efficiency
                 trust_remote_code=True,  # Required for Scout model
+                device_map=device_map,  # Distribute across GPUs
             )
             
             if self.model is None or self.tokenizer is None:
                 raise RuntimeError("Failed to load model or tokenizer")
             
             # Setup LoRA with configuration using Unsloth
-            # Both models should work with FastLanguageModel.get_peft_model
             self.model = FastLanguageModel.get_peft_model(
                 self.model,
                 r=config["lora_rank"],
@@ -578,6 +619,10 @@ class AdvancedMemoryTrainer:
                 use_rslora=False,
                 loftq_config=None,
             )
+            
+            # Prepare model for distributed training
+            if self.device_count > 1:
+                self.model = self.accelerator.prepare(self.model)
             
             self.vram_monitor.log_memory_usage("After Model Loading")
             
@@ -592,7 +637,7 @@ class AdvancedMemoryTrainer:
             raise
         
     def create_training_args(self, config: Dict, output_dir: str) -> TrainingArguments:
-        """Create training arguments based on configuration."""
+        """Create training arguments based on configuration with multi-GPU support."""
         return TrainingArguments(
             per_device_train_batch_size=config["batch_size"],
             gradient_accumulation_steps=config["gradient_accumulation"],
@@ -612,6 +657,9 @@ class AdvancedMemoryTrainer:
             report_to="none",  # No external logging during tuning
             dataloader_pin_memory=False,  # Reduce memory usage
             remove_unused_columns=False,
+            # Multi-GPU specific settings
+            ddp_find_unused_parameters=False,
+            dataloader_num_workers=2 * self.device_count,  # Scale workers with GPU count
         )
     
     def train_with_config(self, config: Dict, dataset: Dataset, trial_name: str) -> Dict:
@@ -630,16 +678,20 @@ class AdvancedMemoryTrainer:
             output_dir = f"{trials_dir}/{trial_name}"
             training_args = self.create_training_args(config, output_dir)
             
-            # Create trainer
+            # Create trainer with distributed support
             trainer = SFTTrainer(
                 model=self.model,
                 tokenizer=self.tokenizer,
                 train_dataset=dataset,
                 dataset_text_field="text",
                 max_seq_length=config["max_seq_length"],
-                dataset_num_proc=2,
+                dataset_num_proc=2 * self.device_count,  # Scale processing with GPU count
                 args=training_args,
             )
+            
+            # Prepare trainer for distributed training
+            if self.device_count > 1:
+                trainer = self.accelerator.prepare(trainer)
             
             self.vram_monitor.log_memory_usage("Before Training")
             
@@ -653,19 +705,22 @@ class AdvancedMemoryTrainer:
             # Extract metrics
             final_loss = train_result.training_loss
             
-            # Prepare results
+            # Prepare results with multi-GPU peak memory
+            total_peak_memory = sum(self.vram_monitor.peak_memory)
             result = {
                 "config": config,
                 "final_loss": final_loss,
                 "training_time": training_time,
-                "peak_memory": self.vram_monitor.peak_memory,
+                "peak_memory": total_peak_memory,
+                "peak_memory_per_gpu": self.vram_monitor.peak_memory,
                 "trial_name": trial_name
             }
             
             print(f"\n✅ Trial {trial_name} Complete!")
             print(f"Final Loss: {final_loss:.4f}")
             print(f"Training Time: {training_time:.2f}s")
-            print(f"Peak Memory: {self.vram_monitor.peak_memory:.2f}GB")
+            print(f"Total Peak Memory: {total_peak_memory:.2f}GB")
+            print(f"Peak Memory per GPU: {[f'{mem:.2f}GB' for mem in self.vram_monitor.peak_memory]}")
             
             # Update best configuration
             if final_loss < self.best_loss:
@@ -885,7 +940,7 @@ class AdvancedMemoryTrainer:
             dataset = self.load_dataset(dataset_path)
             self.load_model_with_config(config)
             
-            # Create training arguments for full training
+            # Create training arguments for full training with multi-GPU support
             training_args = TrainingArguments(
                 per_device_train_batch_size=config["batch_size"],
                 gradient_accumulation_steps=config["gradient_accumulation"],
@@ -903,18 +958,25 @@ class AdvancedMemoryTrainer:
                 save_strategy="epoch",
                 eval_strategy="no",
                 report_to="none",
+                # Multi-GPU specific settings
+                ddp_find_unused_parameters=False,
+                dataloader_num_workers=2 * self.device_count,
             )
             
-            # Create trainer
+            # Create trainer with distributed support
             trainer = SFTTrainer(
                 model=self.model,
                 tokenizer=self.tokenizer,
                 train_dataset=dataset,
                 dataset_text_field="text",
                 max_seq_length=config["max_seq_length"],
-                dataset_num_proc=2,
+                dataset_num_proc=2 * self.device_count,  # Scale processing with GPU count
                 args=training_args,
             )
+            
+            # Prepare trainer for distributed training
+            if self.device_count > 1:
+                trainer = self.accelerator.prepare(trainer)
             
             # Train
             self.vram_monitor.log_memory_usage("Before Final Training")
